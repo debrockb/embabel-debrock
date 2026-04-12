@@ -280,7 +280,8 @@ function AccommodationCard({ acc }) {
       </div>
       <p className="amenities">{acc.amenities && acc.amenities.join(', ')}</p>
       {acc.source && <span className="source-badge">{acc.source}</span>}
-      {acc.bookingUrl && (
+      {acc.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
+      {acc.bookingUrl && acc.source !== 'llm' && (
         <a href={acc.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
       )}
     </div>
@@ -303,7 +304,8 @@ function TransportCard({ t }) {
       {t.stops > 0 && <p className="stops">{t.stops} stop(s)</p>}
       <div className="price">&euro;{t.price}</div>
       {t.source && <span className="source-badge">{t.source}</span>}
-      {t.bookingUrl && (
+      {t.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
+      {t.bookingUrl && t.source !== 'llm' && (
         <a href={t.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
       )}
     </div>

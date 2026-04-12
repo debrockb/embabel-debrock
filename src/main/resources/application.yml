@@ -41,14 +41,13 @@ embabel:
         openai:
           max-attempts: 5
           backoff-millis: 3000
+          custom:
+            base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
+            api-key: ${OPENROUTER_API_KEY:}
         lmstudio:
           base-url: ${LMSTUDIO_BASE_URL:http://localhost:1234}
         ollama:
           base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-        openai:
-          custom:
-            base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
-            api-key: ${OPENROUTER_API_KEY:}
 
 # ─── Spring AI provider config (consumed by Embabel starters) ───────────────
 spring.ai:
@@ -223,6 +222,12 @@ resilience4j:
         limit-for-period: 10
         limit-refresh-period: 60s
         timeout-duration: 30s
+
+matoe:
+  admin:
+    token: ${MATOE_ADMIN_TOKEN:}
+  cors:
+    allowed-origins: ${MATOE_CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 
 logging:
   level:

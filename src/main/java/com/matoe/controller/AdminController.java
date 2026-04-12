@@ -5,6 +5,7 @@ import com.matoe.entity.SearchTargetEntity;
 import com.matoe.repository.SearchTargetRepository;
 import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,9 @@ import java.util.*;
 @CrossOrigin(origins = "*")
 public class AdminController {
 
+    @Value("${matoe.admin.token:}")
+    private String adminToken;
+
     private final DynamicPromptService promptService;
     private final LlmCostTrackingService costService;
     private final SearchTargetRepository searchTargetRepo;
@@ -29,6 +33,15 @@ public class AdminController {
         this.promptService = promptService;
         this.costService = costService;
         this.searchTargetRepo = searchTargetRepo;
+    }
+
+    private void requireAuth(String token) {
+        if (adminToken != null && !adminToken.isBlank()) {
+            if (token == null || !token.equals(adminToken)) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Invalid admin token");
+            }
+        }
     }
 
     // ── Prompt Management ─────────────────────────────────────────────────────
@@ -58,8 +71,10 @@ public class AdminController {
 
     @PostMapping("/prompts/{agentName}")
     public ResponseEntity<PromptVersionEntity> updatePrompt(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @PathVariable String agentName,
             @RequestBody Map<String, String> body) {
+        requireAuth(token);
         String promptText = body.get("promptText");
         String author = body.getOrDefault("author", "admin");
         if (promptText == null || promptText.isBlank()) {
@@ -70,7 +85,9 @@ public class AdminController {
 
     @PostMapping("/prompts/{agentName}/rollback/{version}")
     public ResponseEntity<PromptVersionEntity> rollbackPrompt(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @PathVariable String agentName, @PathVariable int version) {
+        requireAuth(token);
         return ResponseEntity.ok(promptService.rollback(agentName, version));
     }
 
@@ -101,19 +118,27 @@ public class AdminController {
     }
 
     @PostMapping("/search-targets")
-    public ResponseEntity<SearchTargetEntity> addSearchTarget(@RequestBody SearchTargetEntity target) {
+    public ResponseEntity<SearchTargetEntity> addSearchTarget(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @RequestBody SearchTargetEntity target) {
+        requireAuth(token);
         return ResponseEntity.ok(searchTargetRepo.save(target));
     }
 
     @PutMapping("/search-targets/{id}")
     public ResponseEntity<SearchTargetEntity> updateSearchTarget(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @PathVariable Long id, @RequestBody SearchTargetEntity target) {
+        requireAuth(token);
         target.setId(id);
         return ResponseEntity.ok(searchTargetRepo.save(target));
     }
 
     @DeleteMapping("/search-targets/{id}")
-    public ResponseEntity<Void> deleteSearchTarget(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteSearchTarget(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable Long id) {
+        requireAuth(token);
         searchTargetRepo.deleteById(id);
         return ResponseEntity.noContent().build();
     }

@@ -7,7 +7,7 @@ spring:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
     show-sql: false
   datasource:
-    url: jdbc:sqlite::memory:
+    url: "jdbc:sqlite::memory:"
     driver-class-name: org.sqlite.JDBC
   threads:
     virtual:

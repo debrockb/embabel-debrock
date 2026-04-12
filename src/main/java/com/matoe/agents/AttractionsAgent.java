@@ -2,7 +2,6 @@ package com.matoe.agents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matoe.annotations.Action;
 import com.matoe.domain.AttractionOption;
 import com.matoe.domain.TravelRequest;
 import com.matoe.service.BrowserAgentService;
@@ -58,7 +57,6 @@ public class AttractionsAgent {
         dynamicPromptService.registerDefault("attractions-agent", defaultPrompt);
     }
 
-    @Action(name = "search_attractions", preconditions = {"destination_provided"}, effects = {"attractions_found"})
     public List<AttractionOption> searchAttractions(TravelRequest request) {
         String model = request.extractorModel();
         String interestTags = request.interestTags() != null && !request.interestTags().isEmpty()

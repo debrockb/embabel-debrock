@@ -1,5 +1,4 @@
--- M.A.T.O.E Initial Schema (SQLite)
--- PostgreSQL uses a separate migration via db/migration/postgres/ location
+-- M.A.T.O.E Initial Schema (PostgreSQL)
 
 CREATE TABLE IF NOT EXISTS itineraries (
     id                      VARCHAR(36) PRIMARY KEY,
@@ -22,13 +21,12 @@ CREATE TABLE IF NOT EXISTS itineraries (
 CREATE INDEX IF NOT EXISTS idx_itineraries_destination ON itineraries(destination);
 CREATE INDEX IF NOT EXISTS idx_itineraries_created_at ON itineraries(created_at);
 
--- SQLite: INTEGER PRIMARY KEY auto-increments without the AUTOINCREMENT keyword
 CREATE TABLE IF NOT EXISTS prompt_versions (
-    id              INTEGER PRIMARY KEY,
+    id              SERIAL PRIMARY KEY,
     agent_name      VARCHAR(100) NOT NULL,
     prompt_text     TEXT NOT NULL,
     version         INTEGER NOT NULL DEFAULT 1,
-    is_active       BOOLEAN NOT NULL DEFAULT 1,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by      VARCHAR(100) DEFAULT 'system'
 );
@@ -36,7 +34,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 CREATE INDEX IF NOT EXISTS idx_prompt_agent ON prompt_versions(agent_name, is_active);
 
 CREATE TABLE IF NOT EXISTS llm_cost_log (
-    id              INTEGER PRIMARY KEY,
+    id              SERIAL PRIMARY KEY,
     session_id      VARCHAR(100),
     agent_name      VARCHAR(100) NOT NULL,
     model           VARCHAR(200) NOT NULL,
@@ -45,7 +43,7 @@ CREATE TABLE IF NOT EXISTS llm_cost_log (
     output_tokens   INTEGER DEFAULT 0,
     estimated_cost  DOUBLE PRECISION DEFAULT 0.0,
     duration_ms     BIGINT DEFAULT 0,
-    success         BOOLEAN NOT NULL DEFAULT 1,
+    success         BOOLEAN NOT NULL DEFAULT TRUE,
     error_message   TEXT,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -55,10 +53,10 @@ CREATE INDEX IF NOT EXISTS idx_cost_agent ON llm_cost_log(agent_name);
 CREATE INDEX IF NOT EXISTS idx_cost_created ON llm_cost_log(created_at);
 
 CREATE TABLE IF NOT EXISTS search_targets (
-    id              INTEGER PRIMARY KEY,
+    id              SERIAL PRIMARY KEY,
     agent_name      VARCHAR(100) NOT NULL,
     site_url        VARCHAR(500) NOT NULL,
-    enabled         BOOLEAN NOT NULL DEFAULT 1,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
     priority        INTEGER NOT NULL DEFAULT 0,
     rate_limit_rpm  INTEGER DEFAULT 10,
     notes           VARCHAR(500)

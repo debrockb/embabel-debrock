@@ -2,7 +2,6 @@ package com.matoe.agents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matoe.annotations.Action;
 import com.matoe.service.BrowserAgentService;
 import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
@@ -58,7 +57,6 @@ public class CountrySpecialistAgent {
         dynamicPromptService.registerDefault("country-specialist", defaultPrompt);
     }
 
-    @Action(name = "gather_regional_insights", preconditions = {"destination_provided"}, effects = {"regional_insights_available"})
     public Map<String, Object> gatherRegionalInsights(String destination, String modelString) {
         if (modelString == null || modelString.isBlank()) modelString = defaultModel;
 

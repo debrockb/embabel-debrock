@@ -1,76 +1,56 @@
 package com.matoe.service;
 
+import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.core.AgentProcess;
+import com.embabel.agent.core.ProcessOptions;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matoe.agents.*;
+import com.matoe.agents.TravelPlannerAgent.*;
 import com.matoe.domain.*;
 import com.matoe.entity.ItineraryEntity;
 import com.matoe.repository.ItineraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
  * Core orchestration service.
- * Dispatches all specialist agents in parallel using Java Virtual Threads,
- * streams real-time progress to the frontend via SSE, persists results,
- * and returns the final synthesised itinerary.
+ *
+ * Primary path: uses Embabel AgentPlatform to execute the TravelPlannerAgent
+ * via GOAP planning. The planner chains actions by their type signatures
+ * and runs independent actions in parallel (CONCURRENT mode).
+ *
+ * Fallback path: if AgentPlatform is not available (e.g., Embabel starters
+ * not resolved), falls back to direct CompletableFuture dispatch.
  */
 @Service
 public class TravelService {
 
     private static final Logger log = LoggerFactory.getLogger(TravelService.class);
 
-    private final OrchestratorAgent orchestratorAgent;
-    private final HotelAgent hotelAgent;
-    private final BBAgent bbAgent;
-    private final ApartmentAgent apartmentAgent;
-    private final HostelAgent hostelAgent;
-    private final FlightAgent flightAgent;
-    private final CarBusAgent carBusAgent;
-    private final TrainAgent trainAgent;
-    private final FerryAgent ferryAgent;
-    private final CountrySpecialistAgent countrySpecialistAgent;
-    private final AttractionsAgent attractionsAgent;
-    private final WeatherAgent weatherAgent;
-    private final CurrencyAgent currencyAgent;
-    private final ReviewSummaryAgent reviewSummaryAgent;
+    @Autowired(required = false)
+    private AgentPlatform agentPlatform;
+
+    private final TravelPlannerAgent travelPlannerAgent;
     private final AgentProgressService progressService;
+    private final LlmCostTrackingService costTracker;
     private final ItineraryRepository repository;
     private final ObjectMapper objectMapper;
 
     public TravelService(
-            OrchestratorAgent orchestratorAgent,
-            HotelAgent hotelAgent, BBAgent bbAgent,
-            ApartmentAgent apartmentAgent, HostelAgent hostelAgent,
-            FlightAgent flightAgent, CarBusAgent carBusAgent,
-            TrainAgent trainAgent, FerryAgent ferryAgent,
-            CountrySpecialistAgent countrySpecialistAgent,
-            AttractionsAgent attractionsAgent,
-            WeatherAgent weatherAgent, CurrencyAgent currencyAgent,
-            ReviewSummaryAgent reviewSummaryAgent,
+            TravelPlannerAgent travelPlannerAgent,
             AgentProgressService progressService,
+            LlmCostTrackingService costTracker,
             ItineraryRepository repository,
             ObjectMapper objectMapper) {
-        this.orchestratorAgent = orchestratorAgent;
-        this.hotelAgent = hotelAgent;
-        this.bbAgent = bbAgent;
-        this.apartmentAgent = apartmentAgent;
-        this.hostelAgent = hostelAgent;
-        this.flightAgent = flightAgent;
-        this.carBusAgent = carBusAgent;
-        this.trainAgent = trainAgent;
-        this.ferryAgent = ferryAgent;
-        this.countrySpecialistAgent = countrySpecialistAgent;
-        this.attractionsAgent = attractionsAgent;
-        this.weatherAgent = weatherAgent;
-        this.currencyAgent = currencyAgent;
-        this.reviewSummaryAgent = reviewSummaryAgent;
+        this.travelPlannerAgent = travelPlannerAgent;
         this.progressService = progressService;
+        this.costTracker = costTracker;
         this.repository = repository;
         this.objectMapper = objectMapper;
     }
@@ -79,81 +59,30 @@ public class TravelService {
 
     public UnforgettableItinerary planTrip(TravelRequest request, String sessionId) {
         boolean live = sessionId != null && !sessionId.isBlank();
-
         emit(live, sessionId, "Orchestrator", "deployed", 5, "Initialising agent swarm...");
 
-        // ── Phase 1: parallel intelligence gathering ──────────────────────────
-        CompletableFuture<Map<String, Object>> insightsFuture = CompletableFuture.supplyAsync(() -> {
-            emit(live, sessionId, "Country Specialist", "searching", 15, "Researching destination...");
-            Map<String, Object> result = countrySpecialistAgent.gatherRegionalInsights(
-                request.destination(), request.orchestratorModel());
-            emit(live, sessionId, "Country Specialist", "completed", 100, "Insights ready");
-            return result;
-        });
-
-        CompletableFuture<Map<String, Object>> weatherFuture = CompletableFuture.supplyAsync(() -> {
-            emit(live, sessionId, "Weather Agent", "searching", 15, "Checking weather...");
-            Map<String, Object> result = weatherAgent.getWeatherForecast(request);
-            emit(live, sessionId, "Weather Agent", "completed", 100, "Weather data ready");
-            return result;
-        });
-
-        CompletableFuture<Map<String, Object>> currencyFuture = CompletableFuture.supplyAsync(() -> {
-            emit(live, sessionId, "Currency Agent", "searching", 15, "Checking currency...");
-            Map<String, Object> result = currencyAgent.getCurrencyInfo(request);
-            emit(live, sessionId, "Currency Agent", "completed", 100, "Currency info ready");
-            return result;
-        });
-
-        CompletableFuture<Map<String, Object>> reviewFuture = CompletableFuture.supplyAsync(() -> {
-            emit(live, sessionId, "Review Agent", "searching", 15, "Aggregating reviews...");
-            Map<String, Object> result = reviewSummaryAgent.getReviewSummary(request);
-            emit(live, sessionId, "Review Agent", "completed", 100, "Reviews summarised");
-            return result;
-        });
-
-        // ── Phase 2: parallel accommodation + transport + attractions ─────────
-        CompletableFuture<List<AccommodationOption>> accommodationFuture =
-            CompletableFuture.supplyAsync(() -> searchAccommodations(request, sessionId, live));
-
-        CompletableFuture<List<TransportOption>> transportFuture =
-            CompletableFuture.supplyAsync(() -> searchTransport(request, sessionId, live));
-
-        CompletableFuture<List<AttractionOption>> attractionsFuture =
-            CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Attractions Agent", "searching", 20, "Finding attractions...");
-                List<AttractionOption> result = attractionsAgent.searchAttractions(request);
-                emit(live, sessionId, "Attractions Agent", "completed", 100,
-                    result.size() + " attractions found");
-                return result;
-            });
-
-        // Wait for all parallel phases
-        CompletableFuture.allOf(
-            insightsFuture, weatherFuture, currencyFuture, reviewFuture,
-            accommodationFuture, transportFuture, attractionsFuture
-        ).join();
-
-        List<AccommodationOption> accommodations = accommodationFuture.join();
-        List<TransportOption> transport = transportFuture.join();
-        List<AttractionOption> attractions = attractionsFuture.join();
-        Map<String, Object> insights = insightsFuture.join();
-        Map<String, Object> weather = weatherFuture.join();
-        Map<String, Object> currency = currencyFuture.join();
-        Map<String, Object> reviews = reviewFuture.join();
-
-        // Merge review data into insights
-        if (reviews != null && !reviews.isEmpty()) {
-            insights = new HashMap<>(insights);
-            insights.put("reviewSummary", reviews);
+        // Check budget ceiling before starting
+        if (sessionId != null && costTracker.isBudgetExceeded(sessionId)) {
+            log.warn("Session {} budget already exceeded — aborting", sessionId);
+            throw new RuntimeException("LLM budget ceiling exceeded for this session");
         }
 
-        // ── Phase 3: synthesise with orchestrator LLM ────────────────────────
-        emit(live, sessionId, "Orchestrator", "analyzing", 90, "Synthesising itinerary...");
-        UnforgettableItinerary itinerary = orchestratorAgent.synthesizeItinerary(
-            request, accommodations, transport, attractions, insights, weather, currency);
+        UnforgettableItinerary itinerary;
 
-        // ── Phase 4: persist ──────────────────────────────────────────────────
+        if (agentPlatform != null) {
+            // ── PRIMARY: Embabel GOAP execution ──────────────────────────────
+            log.info("Using Embabel AgentPlatform for GOAP-planned execution");
+            itinerary = executeViaEmbabel(request, sessionId);
+        } else {
+            // ── FALLBACK: direct agent dispatch ──────────────────────────────
+            log.info("AgentPlatform not available, using direct dispatch");
+            itinerary = executeDirectly(request, sessionId);
+        }
+
+        // Tier the raw results
+        itinerary = applyTiering(itinerary, request);
+
+        // Persist
         save(itinerary);
 
         emit(live, sessionId, "Orchestrator", "completed", 100, "Itinerary ready!");
@@ -162,127 +91,98 @@ public class TravelService {
         return itinerary;
     }
 
-    public List<UnforgettableItinerary> getAllItineraries() {
-        return repository.findAllByOrderByCreatedAtDesc().stream()
-            .map(this::toItinerary).collect(Collectors.toList());
+    // ── Embabel GOAP path ─────────────────────────────────────────────────────
+
+    private UnforgettableItinerary executeViaEmbabel(TravelRequest request, String sessionId) {
+        try {
+            // Find the TravelPlanner agent in the platform
+            var agent = agentPlatform.agents().stream()
+                .filter(a -> "TravelPlanner".equals(a.getName()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("TravelPlanner agent not found in platform"));
+
+            // Run with the TravelRequest on the blackboard
+            ProcessOptions options = new ProcessOptions();
+            AgentProcess process = agentPlatform.runAgentFrom(
+                agent, options, Map.of("request", request));
+
+            // The GOAP planner will:
+            // 1. See TravelRequest on the blackboard
+            // 2. Plan: gatherIntelligence, searchAccommodations, searchTransport,
+            //          searchAttractions can all run in parallel (all need only TravelRequest)
+            // 3. Then: synthesize needs all 4 outputs + TravelRequest → runs last
+            // 4. Result: UnforgettableItinerary on the blackboard
+
+            AgentProcess completed = process.run();
+            return completed.resultOfType(UnforgettableItinerary.class);
+
+        } catch (Exception e) {
+            log.warn("Embabel GOAP execution failed, falling back to direct: {}", e.getMessage());
+            return executeDirectly(request, sessionId);
+        }
     }
 
-    public List<UnforgettableItinerary> searchItineraries(String destination) {
-        return repository.findByDestinationContainingIgnoreCaseOrderByCreatedAtDesc(destination)
-            .stream().map(this::toItinerary).collect(Collectors.toList());
+    // ── Direct dispatch path (fallback) ───────────────────────────────────────
+
+    private UnforgettableItinerary executeDirectly(TravelRequest request, String sessionId) {
+        // Phase 1: intelligence + accommodation + transport + attractions in parallel
+        var intelligenceFuture = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+            travelPlannerAgent.gatherIntelligence(request));
+        var accommodationFuture = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+            travelPlannerAgent.searchAccommodations(request));
+        var transportFuture = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+            travelPlannerAgent.searchTransport(request));
+        var attractionsFuture = java.util.concurrent.CompletableFuture.supplyAsync(() ->
+            travelPlannerAgent.searchAttractions(request));
+
+        java.util.concurrent.CompletableFuture.allOf(
+            intelligenceFuture, accommodationFuture, transportFuture, attractionsFuture
+        ).join();
+
+        // Check budget mid-flight
+        if (sessionId != null && costTracker.isBudgetExceeded(sessionId)) {
+            log.warn("Session {} budget exceeded mid-execution — skipping synthesis", sessionId);
+            // Return raw results without LLM synthesis
+            TravelIntelligence intel = intelligenceFuture.join();
+            return new UnforgettableItinerary(
+                UUID.randomUUID().toString(), request.destination(),
+                request.startDate().toString(), request.endDate().toString(),
+                request.guestCount(), intel.regionInsights(),
+                accommodationFuture.join().items(), transportFuture.join().items(),
+                attractionsFuture.join().items(), List.of(),
+                0.0, intel.weatherForecast(), intel.currencyInfo(),
+                java.time.LocalDateTime.now()
+            );
+        }
+
+        // Phase 2: synthesize
+        return travelPlannerAgent.synthesize(
+            request,
+            intelligenceFuture.join(),
+            accommodationFuture.join(),
+            transportFuture.join(),
+            attractionsFuture.join()
+        );
     }
 
-    // ── private: accommodation search ─────────────────────────────────────────
+    // ── Tiering ───────────────────────────────────────────────────────────────
 
-    private List<AccommodationOption> searchAccommodations(
-            TravelRequest request, String sessionId, boolean live) {
-
-        List<AccommodationOption> results = new ArrayList<>();
-        List<CompletableFuture<List<AccommodationOption>>> futures = new ArrayList<>();
-
-        if (request.accommodationTypes().contains("hotel")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Hotel Agent", "searching", 20, "Searching hotels...");
-                List<AccommodationOption> r = hotelAgent.searchHotels(request);
-                emit(live, sessionId, "Hotel Agent", "completed", 100, r.size() + " hotels found");
-                return r;
-            }));
-        }
-
-        if (request.accommodationTypes().contains("bb")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "B&B Agent", "searching", 20, "Searching B&Bs...");
-                List<AccommodationOption> r = bbAgent.searchBBs(request);
-                emit(live, sessionId, "B&B Agent", "completed", 100, r.size() + " B&Bs found");
-                return r;
-            }));
-        }
-
-        if (request.accommodationTypes().contains("apartment")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Apartment Agent", "searching", 20, "Searching apartments...");
-                List<AccommodationOption> r = apartmentAgent.searchApartments(request);
-                emit(live, sessionId, "Apartment Agent", "completed", 100, r.size() + " apartments found");
-                return r;
-            }));
-        }
-
-        if (request.accommodationTypes().contains("hostel")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Hostel Agent", "searching", 20, "Searching hostels...");
-                List<AccommodationOption> r = hostelAgent.searchHostels(request);
-                emit(live, sessionId, "Hostel Agent", "completed", 100, r.size() + " hostels found");
-                return r;
-            }));
-        }
-
-        futures.forEach(f -> results.addAll(f.join()));
-        return tierAccommodations(results, request);
+    private UnforgettableItinerary applyTiering(UnforgettableItinerary it, TravelRequest request) {
+        List<AccommodationOption> tiered = tierAccommodations(it.accommodations(), request);
+        List<TransportOption> tieredTransport = tierTransport(it.transport(), request);
+        return new UnforgettableItinerary(
+            it.id(), it.destination(), it.startDate(), it.endDate(), it.guestCount(),
+            it.regionInsights(), tiered, tieredTransport, it.attractions(), it.variants(),
+            it.totalEstimatedCost(), it.weatherForecast(), it.currencyInfo(), it.createdAt()
+        );
     }
-
-    // ── private: transport search ─────────────────────────────────────────────
-
-    private List<TransportOption> searchTransport(
-            TravelRequest request, String sessionId, boolean live) {
-
-        List<TransportOption> results = new ArrayList<>();
-        List<CompletableFuture<List<TransportOption>>> futures = new ArrayList<>();
-
-        if (request.transportTypes().contains("flight")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Flight Agent", "searching", 20, "Searching flights...");
-                List<TransportOption> r = flightAgent.searchFlights(request);
-                emit(live, sessionId, "Flight Agent", "completed", 100, r.size() + " flights found");
-                return r;
-            }));
-        }
-
-        if (request.transportTypes().contains("car") || request.transportTypes().contains("bus")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Car/Bus Agent", "searching", 20, "Searching ground transport...");
-                List<TransportOption> r = carBusAgent.searchGroundTransport(request);
-                emit(live, sessionId, "Car/Bus Agent", "completed", 100, r.size() + " ground options found");
-                return r;
-            }));
-        }
-
-        if (request.transportTypes().contains("train")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Train Agent", "searching", 20, "Searching trains...");
-                List<TransportOption> r = trainAgent.searchTrains(request);
-                emit(live, sessionId, "Train Agent", "completed", 100, r.size() + " train routes found");
-                return r;
-            }));
-        }
-
-        if (request.transportTypes().contains("ferry")) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                emit(live, sessionId, "Ferry Agent", "searching", 20, "Searching ferries...");
-                List<TransportOption> r = ferryAgent.searchFerries(request);
-                emit(live, sessionId, "Ferry Agent", "completed", 100, r.size() + " ferry routes found");
-                return r;
-            }));
-        }
-
-        futures.forEach(f -> results.addAll(f.join()));
-        return tierTransport(results, request);
-    }
-
-    // ── SSE helper ────────────────────────────────────────────────────────────
-
-    private void emit(boolean live, String sessionId, String agent,
-                      String status, int progress, String message) {
-        if (live) progressService.update(sessionId, agent, status, progress, message);
-    }
-
-    // ── tiering ───────────────────────────────────────────────────────────────
 
     private List<AccommodationOption> tierAccommodations(
             List<AccommodationOption> list, TravelRequest request) {
-        if (list.isEmpty()) return list;
+        if (list == null || list.isEmpty()) return List.of();
         double mid = (request.budgetMax() - request.budgetMin()) / 2.0;
-        double budgetLine  = mid * 0.7;
-        double luxuryLine  = mid * 1.3;
+        double budgetLine = mid * 0.7;
+        double luxuryLine = mid * 1.3;
         return list.stream().map(a -> {
             String tier = a.pricePerNight() <= budgetLine ? "budget"
                         : a.pricePerNight() <= luxuryLine ? "standard" : "luxury";
@@ -294,7 +194,7 @@ public class TravelService {
 
     private List<TransportOption> tierTransport(
             List<TransportOption> list, TravelRequest request) {
-        if (list.isEmpty()) return list;
+        if (list == null || list.isEmpty()) return List.of();
         double avg = list.stream().mapToDouble(TransportOption::price).average().orElse(200);
         double budgetLine = avg * 0.7;
         double luxuryLine = avg * 1.3;
@@ -307,7 +207,26 @@ public class TravelService {
         }).collect(Collectors.toList());
     }
 
-    // ── persistence helpers ───────────────────────────────────────────────────
+    // ── Query API ─────────────────────────────────────────────────────────────
+
+    public List<UnforgettableItinerary> getAllItineraries() {
+        return repository.findAllByOrderByCreatedAtDesc().stream()
+            .map(this::toItinerary).collect(Collectors.toList());
+    }
+
+    public List<UnforgettableItinerary> searchItineraries(String destination) {
+        return repository.findByDestinationContainingIgnoreCaseOrderByCreatedAtDesc(destination)
+            .stream().map(this::toItinerary).collect(Collectors.toList());
+    }
+
+    // ── SSE helper ────────────────────────────────────────────────────────────
+
+    private void emit(boolean live, String sessionId, String agent,
+                      String status, int progress, String message) {
+        if (live) progressService.update(sessionId, agent, status, progress, message);
+    }
+
+    // ── Persistence ───────────────────────────────────────────────────────────
 
     private void save(UnforgettableItinerary it) {
         try {

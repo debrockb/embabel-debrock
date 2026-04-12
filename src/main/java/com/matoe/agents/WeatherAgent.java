@@ -2,7 +2,6 @@ package com.matoe.agents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matoe.annotations.Action;
 import com.matoe.domain.TravelRequest;
 import com.matoe.service.BrowserAgentService;
 import com.matoe.service.DynamicPromptService;
@@ -53,7 +52,6 @@ public class WeatherAgent {
         dynamicPromptService.registerDefault("weather-agent", defaultPrompt);
     }
 
-    @Action(name = "get_weather_forecast", preconditions = {"destination_provided"}, effects = {"weather_forecast_available"})
     public Map<String, Object> getWeatherForecast(TravelRequest request) {
         String model = request.extractorModel();
 

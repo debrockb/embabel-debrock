@@ -214,31 +214,33 @@ async def browse(req: BrowseRequest):
 
             browser_cfg = BrowserConfig(headless=BROWSER_HEADLESS)
             browser = Browser(config=browser_cfg)
+            try:
+                agent = BrowserAgent(
+                    task=full_task,
+                    llm=llm,
+                    browser=browser,
+                    max_actions_per_step=4,
+                )
 
-            agent = BrowserAgent(
-                task=full_task,
-                llm=llm,
-                browser=browser,
-                max_actions_per_step=4,
-            )
+                result_obj = await asyncio.wait_for(
+                    agent.run(max_steps=req.max_steps),
+                    timeout=req.timeout_seconds,
+                )
 
-            result_obj = await asyncio.wait_for(
-                agent.run(max_steps=req.max_steps),
-                timeout=req.timeout_seconds,
-            )
+                raw_text = str(result_obj.final_result()) if result_obj else ""
+                parsed = parse_result(raw_text)
+                duration = time.time() - start
 
-            raw_text = str(result_obj.final_result()) if result_obj else ""
-            parsed = parse_result(raw_text)
-            duration = time.time() - start
-
-            log.info("Browse task completed in %.1fs — task: %.80s", duration, req.task)
-            return BrowseResponse(
-                success=True,
-                result=parsed,
-                raw_text=raw_text,
-                steps_taken=len(result_obj.history()) if result_obj else 0,
-                duration_seconds=round(duration, 2),
-            )
+                log.info("Browse task completed in %.1fs — task: %.80s", duration, req.task)
+                return BrowseResponse(
+                    success=True,
+                    result=parsed,
+                    raw_text=raw_text,
+                    steps_taken=len(result_obj.history()) if result_obj else 0,
+                    duration_seconds=round(duration, 2),
+                )
+            finally:
+                await browser.close()
 
         except asyncio.TimeoutError:
             log.warning("Browse task timed out after %ds — task: %.80s", req.timeout_seconds, req.task)
