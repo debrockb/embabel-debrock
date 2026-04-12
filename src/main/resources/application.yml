@@ -12,11 +12,6 @@ spring:
   threads:
     virtual:
       enabled: true
-  web:
-    cors:
-      allowed-origins: "*"
-      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-      allowed-headers: "*"
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -26,6 +21,43 @@ server:
   servlet:
     context-path: /api
 
+# ─── Embabel Agent Platform ─────────────────────────────────────────────────
+embabel:
+  models:
+    default-llm: claude-3-5-sonnet-20241022
+    llms:
+      orchestrator: claude-3-5-sonnet-20241022
+      extractor: llama-3-8b
+      country-specialist: llama-3-8b
+      best: claude-3-5-sonnet-20241022
+      cheapest: llama-3-8b
+  agent:
+    platform:
+      process-type: CONCURRENT
+      models:
+        anthropic:
+          max-attempts: 5
+          backoff-millis: 3000
+        openai:
+          max-attempts: 5
+          backoff-millis: 3000
+        lmstudio:
+          base-url: ${LMSTUDIO_BASE_URL:http://localhost:1234}
+        ollama:
+          base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+        openai:
+          custom:
+            base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
+            api-key: ${OPENROUTER_API_KEY:}
+
+# ─── Spring AI provider config (consumed by Embabel starters) ───────────────
+spring.ai:
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+
+# ─── Travel Agency Config ───────────────────────────────────────────────────
 travel-agency:
   models:
     default-orchestrator: "anthropic/claude-3-5-sonnet"
@@ -36,31 +68,91 @@ travel-agency:
     orchestrator: |
       You are an elite travel agent orchestrating a multi-agent system to plan unforgettable trips.
       Synthesize accommodation and transport options into 3 itinerary variants (Budget, Standard, Luxury).
-      Return a JSON object with all details and day-by-day breakdown.
+      For each variant, create a day-by-day breakdown with morning/afternoon/evening activities,
+      meal suggestions, transport notes, and estimated daily costs.
+      Return a JSON object with the three variants and overall trip summary.
 
     hotel-agent: |
-      Find hotels matching the criteria. For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Find hotels in {{destination}} for {{guestCount}} guests, {{startDate}} to {{endDate}} ({{nights}} nights).
+      Budget: €{{budgetMin}}–€{{budgetMax}} total. Style: {{travelStyle}}.
+      For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     bb-agent: |
-      Find bed-and-breakfasts and charming guesthouses. For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Find bed-and-breakfasts and charming guesthouses in {{destination}} for {{guestCount}} guests,
+      {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     apartment-agent: |
-      Find holiday apartments and short-term rentals suitable for {{guestCount}} guests. For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Find holiday apartments and short-term rentals in {{destination}} suitable for {{guestCount}} guests,
+      {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+
+    hostel-agent: |
+      Find hostels and budget accommodation in {{destination}} for {{guestCount}} guests,
+      {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     flight-agent: |
-      Find flights for {{guestCount}} passengers. For each return: airline, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl.
+      Find flights for {{guestCount}} passengers from {{originCity}} to {{destination}},
+      departing {{startDate}} returning {{endDate}}.
+      For each return: airline, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl.
       Price is per person. Return ONLY valid JSON array.
 
-    car-bus-agent: |
-      Find ground transport (car rental or bus). For each return: type (car or bus), provider, departureTime, arrivalTime, duration, price (total trip), bookingUrl.
+    train-agent: |
+      Find train routes for {{guestCount}} passengers from {{originCity}} to {{destination}},
+      departing {{startDate}}.
+      For each return: operator, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl, class.
       Return ONLY valid JSON array.
+
+    car-agent: |
+      Find car rental options in {{destination}} for {{days}} days, pick-up {{startDate}}, drop-off {{endDate}}.
+      For each return: provider, carType, pricePerDay, totalPrice, pickupLocation, dropoffLocation, bookingUrl.
+      Return ONLY valid JSON array.
+
+    bus-agent: |
+      Find bus routes for {{guestCount}} passengers from {{originCity}} to {{destination}},
+      departing {{startDate}}.
+      For each return: operator, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl.
+      Return ONLY valid JSON array.
+
+    ferry-agent: |
+      Find ferry routes for {{guestCount}} passengers from {{originCity}} to {{destination}},
+      departing {{startDate}}.
+      For each return: operator, departureTime, arrivalTime, duration, price (per person), bookingUrl, cabinType.
+      Return ONLY valid JSON array.
+
+    attractions-agent: |
+      Find top attractions and experiences in {{destination}} matching interests: {{interestTags}}.
+      Trip duration: {{nights}} days. Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      For each return: name, description, category, price, duration, rating, location, bookingUrl, tags (array).
+      Return ONLY valid JSON array of 8-12 attractions.
+
+    weather-agent: |
+      Provide a weather forecast for {{destination}} from {{startDate}} to {{endDate}}.
+      Return a JSON object with: averageTemp, highTemp, lowTemp, precipitation, humidity,
+      packingTips (array of strings), weatherWarnings (array of strings).
+      Return ONLY valid JSON.
+
+    currency-agent: |
+      Provide currency information for travelling to {{destination}}.
+      Return a JSON object with: localCurrency, currencyCode, exchangeRate (vs EUR),
+      tippingCustoms, atmAvailability, cardAcceptance, costOfLiving (brief comparison).
+      Return ONLY valid JSON.
+
+    review-summary-agent: |
+      Summarize traveller reviews for {{destination}}.
+      Return a JSON object with: overallSentiment, topPros (array), topCons (array),
+      bestFor (array of traveller types), avoidIf (array), safetyRating (1-5), cleanlinessRating (1-5).
+      Return ONLY valid JSON.
 
     country-specialist: |
       You are a regional travel expert. Provide travel intelligence for {{destination}} as a JSON object with keys:
-      bestTimeToVisit, localTransitRecommendation, culturalTips, safetyConsiderations, currency, language.
+      bestTimeToVisit, localTransitRecommendation, culturalTips, safetyConsiderations, currency, language,
+      weatherExpectation, localCuisine, visaRequirements, emergencyNumbers.
       Return ONLY valid JSON, no explanation.
 
   web-scraping:
@@ -70,6 +162,25 @@ travel-agency:
     proxy-enabled: false
     proxy-list: []
 
+  browser:
+    hotel-sites: "booking.com,hotels.com,expedia.com"
+    bb-sites: "booking.com,airbnb.com,bedandbreakfast.com"
+    apartment-sites: "airbnb.com,vrbo.com,booking.com"
+    hostel-sites: "hostelworld.com,booking.com"
+    flight-sites: "skyscanner.com,google.com/flights,kayak.com"
+    train-sites: "thetrainline.com,omio.com,seat61.com"
+    car-sites: "rentalcars.com,kayak.com/cars"
+    bus-sites: "flixbus.com,busbud.com,rome2rio.com"
+    ferry-sites: "directferries.com,aferry.com"
+    attraction-sites: "viator.com,getyourguide.com,tripadvisor.com"
+    country-sites: "lonelyplanet.com,tripadvisor.com,wikitravel.org"
+
+  cost-tracking:
+    enabled: true
+    per-session-budget-usd: 2.00
+    warn-at-percent: 80
+
+# ─── Direct LLM config (used by LlmService for non-Embabel calls) ──────────
 anthropic:
   api:
     key: ${ANTHROPIC_API_KEY:}
@@ -90,18 +201,31 @@ openrouter:
 browser-service:
   url: ${BROWSER_SERVICE_URL:http://localhost:8001}
   timeout-seconds: 120
+  max-steps: 20
   enabled: ${BROWSER_SERVICE_ENABLED:true}
 
-travel-agency:
-  browser:
-    hotel-sites: "booking.com,hotels.com,expedia.com"
-    bb-sites: "booking.com,airbnb.com,bedandbreakfast.com"
-    apartment-sites: "airbnb.com,vrbo.com,booking.com"
-    flight-sites: "skyscanner.com,google.com/flights,kayak.com"
-    car-bus-sites: "rentalcars.com,rome2rio.com,busbud.com"
-    country-sites: "lonelyplanet.com,tripadvisor.com,wikitravel.org"
+# ─── Resilience4j circuit breakers ──────────────────────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      browser-service:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 3
+      llm-service:
+        sliding-window-size: 5
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+  ratelimiter:
+    instances:
+      browser-service:
+        limit-for-period: 10
+        limit-refresh-period: 60s
+        timeout-duration: 30s
 
 logging:
   level:
     root: INFO
     com.matoe: DEBUG
+    com.embabel: INFO

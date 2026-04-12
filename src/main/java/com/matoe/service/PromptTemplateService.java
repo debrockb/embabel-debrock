@@ -46,12 +46,23 @@ public class PromptTemplateService {
     }
 
     /**
+     * Build a user prompt for hostel search.
+     */
+    public String buildHostelPrompt(String template, TravelRequest request) {
+        long nights = calculateNights(request);
+        Map<String, String> variables = buildBaseVariables(request, nights);
+        variables.put("nights", String.valueOf(nights));
+        return substituteVariables(template, variables);
+    }
+
+    /**
      * Build a user prompt for flight search.
      */
     public String buildFlightPrompt(String template, TravelRequest request) {
         Map<String, String> variables = buildBaseVariables(request, 0);
         variables.put("guestCount", String.valueOf(request.guestCount()));
         variables.put("maxBudget", String.format("%.2f", request.budgetMax()));
+        variables.put("originCity", request.originCity() != null ? request.originCity() : "nearest major airport");
         return substituteVariables(template, variables);
     }
 
@@ -67,9 +78,53 @@ public class PromptTemplateService {
         return substituteVariables(template, variables);
     }
 
-    /**
-     * Build a user prompt for country specialist.
-     */
+    /** Build prompt for train search. */
+    public String buildTrainPrompt(String template, TravelRequest request) {
+        Map<String, String> variables = buildBaseVariables(request, calculateNights(request));
+        variables.put("days", String.valueOf(calculateNights(request)));
+        variables.put("guestCount", String.valueOf(request.guestCount()));
+        variables.put("maxBudget", String.format("%.2f", request.budgetMax()));
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for ferry search. */
+    public String buildFerryPrompt(String template, TravelRequest request) {
+        Map<String, String> variables = buildBaseVariables(request, calculateNights(request));
+        variables.put("guestCount", String.valueOf(request.guestCount()));
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for attractions search. */
+    public String buildAttractionsPrompt(String template, TravelRequest request) {
+        long nights = calculateNights(request);
+        Map<String, String> variables = buildBaseVariables(request, nights);
+        variables.put("nights", String.valueOf(nights));
+        variables.put("interestTags", request.interestTags() != null ?
+            String.join(", ", request.interestTags()) : "general sightseeing");
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for weather forecast. */
+    public String buildWeatherPrompt(String template, TravelRequest request) {
+        Map<String, String> variables = buildBaseVariables(request, 0);
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for currency info. */
+    public String buildCurrencyPrompt(String template, TravelRequest request) {
+        Map<String, String> variables = new HashMap<>();
+        variables.put("destination", request.destination());
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for review summary. */
+    public String buildReviewPrompt(String template, TravelRequest request) {
+        Map<String, String> variables = new HashMap<>();
+        variables.put("destination", request.destination());
+        return substituteVariables(template, variables);
+    }
+
+    /** Build prompt for country specialist. */
     public String buildCountrySpecialistPrompt(String template, TravelRequest request) {
         Map<String, String> variables = new HashMap<>();
         variables.put("destination", request.destination());
@@ -109,6 +164,9 @@ public class PromptTemplateService {
         vars.put("budgetMin", String.format("%.2f", request.budgetMin()));
         vars.put("budgetMax", String.format("%.2f", request.budgetMax()));
         vars.put("travelStyle", request.travelStyle());
+        vars.put("originCity", request.originCity() != null ? request.originCity() : "");
+        vars.put("interestTags", request.interestTags() != null ?
+            String.join(", ", request.interestTags()) : "");
         if (nights > 0) {
             vars.put("nights", String.valueOf(nights));
         }

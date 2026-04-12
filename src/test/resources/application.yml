@@ -1,0 +1,120 @@
+spring:
+  application:
+    name: matoe-test
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    show-sql: false
+  datasource:
+    url: jdbc:sqlite::memory:
+    driver-class-name: org.sqlite.JDBC
+  threads:
+    virtual:
+      enabled: true
+  flyway:
+    enabled: false
+
+server:
+  port: 0
+  servlet:
+    context-path: /api
+
+embabel:
+  models:
+    default-llm: claude-3-5-sonnet-20241022
+    llms:
+      orchestrator: claude-3-5-sonnet-20241022
+      extractor: llama-3-8b
+      country-specialist: llama-3-8b
+      best: claude-3-5-sonnet-20241022
+      cheapest: llama-3-8b
+  agent:
+    platform:
+      process-type: CONCURRENT
+      models:
+        anthropic:
+          max-attempts: 1
+          backoff-millis: 100
+
+spring.ai:
+  anthropic:
+    api-key: test-key
+  openai:
+    api-key: test-key
+
+travel-agency:
+  models:
+    default-orchestrator: "anthropic/claude-3-5-sonnet"
+    default-extractor: "lmstudio/llama-3-8b"
+    country-specialist: "lmstudio/llama-3-8b"
+
+  prompts:
+    orchestrator: "Test orchestrator prompt"
+    hotel-agent: "Find hotels in {{destination}} for {{guestCount}} guests, {{nights}} nights."
+    bb-agent: "Find B&Bs in {{destination}} for {{guestCount}} guests."
+    apartment-agent: "Find apartments in {{destination}} for {{guestCount}} guests."
+    hostel-agent: "Find hostels in {{destination}}."
+    flight-agent: "Find flights from {{originCity}} to {{destination}} for {{guestCount}} passengers."
+    train-agent: "Find trains."
+    car-agent: "Find car rentals."
+    bus-agent: "Find bus routes."
+    ferry-agent: "Find ferries."
+    attractions-agent: "Find attractions in {{destination}}."
+    weather-agent: "Weather for {{destination}}."
+    currency-agent: "Currency for {{destination}}."
+    review-summary-agent: "Reviews for {{destination}}."
+    country-specialist: "Regional travel expert for {{destination}}."
+
+  web-scraping:
+    user-agent: "Test-Agent"
+    timeout-seconds: 5
+    max-concurrent-scrapes: 2
+    proxy-enabled: false
+    proxy-list: []
+
+  browser:
+    hotel-sites: "booking.com"
+    bb-sites: "booking.com"
+    apartment-sites: "airbnb.com"
+    hostel-sites: "hostelworld.com"
+    flight-sites: "skyscanner.com"
+    train-sites: "thetrainline.com"
+    car-sites: "rentalcars.com"
+    bus-sites: "flixbus.com"
+    ferry-sites: "directferries.com"
+    attraction-sites: "viator.com"
+    country-sites: "lonelyplanet.com"
+
+  cost-tracking:
+    enabled: true
+    per-session-budget-usd: 2.00
+    warn-at-percent: 80
+
+anthropic:
+  api:
+    key: test-key
+    model: claude-3-5-sonnet-20241022
+    base-url: https://api.anthropic.com
+    version: 2023-06-01
+
+lmstudio:
+  base-url: http://localhost:1234/v1
+
+ollama:
+  base-url: http://localhost:11434/v1
+
+openrouter:
+  api-key: test-key
+  base-url: https://openrouter.ai/api/v1
+
+browser-service:
+  url: http://localhost:8001
+  timeout-seconds: 5
+  max-steps: 5
+  enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.matoe: DEBUG

@@ -3,11 +3,6 @@ package com.matoe.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-/**
- * JPA entity for persisting completed itineraries.
- * Nested collections (accommodations, transport, regional insights) are stored
- * as JSON text columns — they are always read together and never joined independently.
- */
 @Entity
 @Table(name = "itineraries", indexes = {
     @Index(name = "idx_itineraries_destination", columnList = "destination"),
@@ -46,7 +41,20 @@ public class ItineraryEntity {
     @Column(name = "transport_json", columnDefinition = "TEXT")
     private String transportJson;
 
-    // ── constructors ──────────────────────────────────────────────────────────
+    @Column(name = "attractions_json", columnDefinition = "TEXT")
+    private String attractionsJson;
+
+    @Column(name = "variants_json", columnDefinition = "TEXT")
+    private String variantsJson;
+
+    @Column(name = "weather_json", columnDefinition = "TEXT")
+    private String weatherJson;
+
+    @Column(name = "currency_json", columnDefinition = "TEXT")
+    private String currencyJson;
+
+    @Column(name = "request_json", columnDefinition = "TEXT")
+    private String requestJson;
 
     public ItineraryEntity() {}
 
@@ -65,8 +73,7 @@ public class ItineraryEntity {
         this.transportJson = transportJson;
     }
 
-    // ── getters / setters ─────────────────────────────────────────────────────
-
+    // Getters & setters
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getDestination() { return destination; }
@@ -78,13 +85,23 @@ public class ItineraryEntity {
     public int getGuestCount() { return guestCount; }
     public void setGuestCount(int guestCount) { this.guestCount = guestCount; }
     public double getTotalEstimatedCost() { return totalEstimatedCost; }
-    public void setTotalEstimatedCost(double totalEstimatedCost) { this.totalEstimatedCost = totalEstimatedCost; }
+    public void setTotalEstimatedCost(double v) { this.totalEstimatedCost = v; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public String getRegionInsightsJson() { return regionInsightsJson; }
-    public void setRegionInsightsJson(String regionInsightsJson) { this.regionInsightsJson = regionInsightsJson; }
+    public void setRegionInsightsJson(String v) { this.regionInsightsJson = v; }
     public String getAccommodationsJson() { return accommodationsJson; }
-    public void setAccommodationsJson(String accommodationsJson) { this.accommodationsJson = accommodationsJson; }
+    public void setAccommodationsJson(String v) { this.accommodationsJson = v; }
     public String getTransportJson() { return transportJson; }
-    public void setTransportJson(String transportJson) { this.transportJson = transportJson; }
+    public void setTransportJson(String v) { this.transportJson = v; }
+    public String getAttractionsJson() { return attractionsJson; }
+    public void setAttractionsJson(String v) { this.attractionsJson = v; }
+    public String getVariantsJson() { return variantsJson; }
+    public void setVariantsJson(String v) { this.variantsJson = v; }
+    public String getWeatherJson() { return weatherJson; }
+    public void setWeatherJson(String v) { this.weatherJson = v; }
+    public String getCurrencyJson() { return currencyJson; }
+    public void setCurrencyJson(String v) { this.currencyJson = v; }
+    public String getRequestJson() { return requestJson; }
+    public void setRequestJson(String v) { this.requestJson = v; }
 }

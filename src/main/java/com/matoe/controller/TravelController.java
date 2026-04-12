@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/travel")
@@ -49,7 +50,11 @@ public class TravelController {
     }
 
     @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("M.A.T.O.E backend is running");
+    public ResponseEntity<Map<String, Object>> health() {
+        return ResponseEntity.ok(Map.of(
+            "status", "ok",
+            "service", "M.A.T.O.E",
+            "version", "0.1.0"
+        ));
     }
 }

@@ -1,0 +1,17 @@
+## Docker profile — activates when SPRING_PROFILES_ACTIVE=docker
+## Overrides SQLite defaults with PostgreSQL for the Docker Compose stack.
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/matoe}
+    username: ${SPRING_DATASOURCE_USERNAME:matoe_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:matoe_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration

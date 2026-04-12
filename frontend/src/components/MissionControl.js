@@ -4,6 +4,7 @@ import './MissionControl.css';
 function MissionControl({ onPlanTrip, isLoading }) {
   const [formData, setFormData] = useState({
     destination: '',
+    originCity: '',
     startDate: '',
     endDate: '',
     guestCount: 1,
@@ -12,6 +13,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
     travelStyle: 'standard',
     accommodationTypes: ['hotel', 'bb', 'apartment'],
     transportTypes: ['flight', 'car'],
+    interestTags: [],
     orchestratorModel: 'anthropic/claude-3-5-sonnet',
     extractorModel: 'lmstudio/llama-3-8b',
   });
@@ -45,16 +47,29 @@ function MissionControl({ onPlanTrip, isLoading }) {
       <h2>🎯 Mission Control Dashboard</h2>
 
       <form onSubmit={handleSubmit} className="control-form">
-        <div className="form-group">
-          <label>Destination</label>
-          <input
-            type="text"
-            name="destination"
-            value={formData.destination}
-            onChange={handleInputChange}
-            placeholder="e.g., Tokyo, Paris, New York"
-            required
-          />
+        <div className="form-row">
+          <div className="form-group">
+            <label>Destination</label>
+            <input
+              type="text"
+              name="destination"
+              value={formData.destination}
+              onChange={handleInputChange}
+              placeholder="e.g., Tokyo, Paris, New York"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Origin City</label>
+            <input
+              type="text"
+              name="originCity"
+              value={formData.originCity}
+              onChange={handleInputChange}
+              placeholder="e.g., London, Amsterdam"
+            />
+            <span className="field-hint">For transport routing</span>
+          </div>
         </div>
 
         <div className="form-row">
@@ -162,6 +177,16 @@ function MissionControl({ onPlanTrip, isLoading }) {
               />
               Apartments
             </label>
+            <label>
+              <input
+                type="checkbox"
+                name="accommodationTypes_"
+                value="hostel"
+                checked={formData.accommodationTypes.includes('hostel')}
+                onChange={handleInputChange}
+              />
+              Hostels
+            </label>
           </div>
         </div>
 
@@ -198,6 +223,44 @@ function MissionControl({ onPlanTrip, isLoading }) {
               />
               Bus
             </label>
+            <label>
+              <input
+                type="checkbox"
+                name="transportTypes_"
+                value="train"
+                checked={formData.transportTypes.includes('train')}
+                onChange={handleInputChange}
+              />
+              Train
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                name="transportTypes_"
+                value="ferry"
+                checked={formData.transportTypes.includes('ferry')}
+                onChange={handleInputChange}
+              />
+              Ferry
+            </label>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Interests</label>
+          <div className="checkbox-group">
+            {['food', 'history', 'nature', 'nightlife', 'art', 'adventure', 'shopping', 'relaxation'].map((tag) => (
+              <label key={tag}>
+                <input
+                  type="checkbox"
+                  name="interestTags_"
+                  value={tag}
+                  checked={formData.interestTags.includes(tag)}
+                  onChange={handleInputChange}
+                />
+                {tag.charAt(0).toUpperCase() + tag.slice(1)}
+              </label>
+            ))}
           </div>
         </div>
 

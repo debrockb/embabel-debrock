@@ -1,26 +1,22 @@
-FROM node:18-alpine
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install dependencies
 COPY package*.json ./
+RUN npm ci --production=false
 
-# Install dependencies
-RUN npm install
-
-# Copy source code
+# Copy source code and build
 COPY public public/
 COPY src src/
-
-# Build the app
 RUN npm run build
 
-# Serve with a lightweight HTTP server
-FROM node:18-alpine
-RUN npm install -g serve
-WORKDIR /app
-COPY --from=0 /app/build ./build
+# ─── Production: nginx serves static files + reverse-proxies /api to backend
+FROM nginx:alpine
 
-EXPOSE 3000
+COPY --from=build /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-CMD ["serve", "-s", "build", "-l", "3000"]
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

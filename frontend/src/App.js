@@ -3,15 +3,23 @@ import './App.css';
 import MissionControl from './components/MissionControl';
 import LiveAgentTracker from './components/LiveAgentTracker';
 import ItineraryCanvas from './components/ItineraryCanvas';
+import AdminDashboard from './components/AdminDashboard';
 
 const INITIAL_AGENTS = [
   { name: 'Orchestrator',       status: 'idle', progress: 0 },
   { name: 'Country Specialist', status: 'idle', progress: 0 },
+  { name: 'Weather Agent',      status: 'idle', progress: 0 },
+  { name: 'Currency Agent',     status: 'idle', progress: 0 },
+  { name: 'Review Agent',       status: 'idle', progress: 0 },
   { name: 'Hotel Agent',        status: 'idle', progress: 0 },
   { name: 'B&B Agent',          status: 'idle', progress: 0 },
   { name: 'Apartment Agent',    status: 'idle', progress: 0 },
+  { name: 'Hostel Agent',       status: 'idle', progress: 0 },
   { name: 'Flight Agent',       status: 'idle', progress: 0 },
   { name: 'Car/Bus Agent',      status: 'idle', progress: 0 },
+  { name: 'Train Agent',        status: 'idle', progress: 0 },
+  { name: 'Ferry Agent',        status: 'idle', progress: 0 },
+  { name: 'Attractions Agent',  status: 'idle', progress: 0 },
 ];
 
 function App() {
@@ -19,6 +27,7 @@ function App() {
   const [agents, setAgents]         = useState(INITIAL_AGENTS);
   const [isLoading, setIsLoading]   = useState(false);
   const [error, setError]           = useState(null);
+  const [activeView, setActiveView] = useState('planner');  // 'planner' | 'admin'
   const eventSourceRef              = useRef(null);
 
   const updateAgent = useCallback((name, status, progress) => {
@@ -41,12 +50,10 @@ function App() {
     setAgents(INITIAL_AGENTS);
     closeEventSource();
 
-    // Generate a unique session ID — must be created client-side BEFORE the POST
-    // so the SSE stream is open before the backend starts broadcasting.
     const sessionId = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     // Open SSE stream first
-    const es = new EventSource(`/travel/progress/${sessionId}`);
+    const es = new EventSource(`/api/travel/progress/${sessionId}`);
     eventSourceRef.current = es;
 
     es.addEventListener('agent-progress', (e) => {
@@ -60,7 +67,7 @@ function App() {
     es.onerror = () => closeEventSource();
 
     try {
-      const response = await fetch(`/travel/plan?sessionId=${sessionId}`, {
+      const response = await fetch(`/api/travel/plan?sessionId=${sessionId}`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(travelRequest),
@@ -73,7 +80,6 @@ function App() {
 
       const data = await response.json();
       setItinerary(data);
-      // Mark any still-running agents as completed
       setAgents(prev => prev.map(a =>
         a.status !== 'completed' ? { ...a, status: 'completed', progress: 100 } : a
       ));
@@ -94,6 +100,16 @@ function App() {
       <header className="app-header">
         <h1>M.A.T.O.E</h1>
         <p>Multi-Agent Travel Orchestration Engine</p>
+        <nav className="app-nav">
+          <button
+            className={activeView === 'planner' ? 'active' : ''}
+            onClick={() => setActiveView('planner')}
+          >Trip Planner</button>
+          <button
+            className={activeView === 'admin' ? 'active' : ''}
+            onClick={() => setActiveView('admin')}
+          >Admin</button>
+        </nav>
       </header>
 
       <main className="app-main">
@@ -104,19 +120,28 @@ function App() {
           </div>
         )}
 
-        <div className="dashboard">
-          <section className="control-panel">
-            <MissionControl onPlanTrip={handlePlanTrip} isLoading={isLoading} />
-          </section>
+        {activeView === 'planner' && (
+          <>
+            <div className="dashboard">
+              <section className="control-panel">
+                <MissionControl onPlanTrip={handlePlanTrip} isLoading={isLoading} />
+              </section>
+              <section className="tracker-panel">
+                <LiveAgentTracker agents={agents} isLoading={isLoading} />
+              </section>
+            </div>
 
-          <section className="tracker-panel">
-            <LiveAgentTracker agents={agents} isLoading={isLoading} />
-          </section>
-        </div>
+            {itinerary && (
+              <section className="itinerary-panel">
+                <ItineraryCanvas itinerary={itinerary} />
+              </section>
+            )}
+          </>
+        )}
 
-        {itinerary && (
-          <section className="itinerary-panel">
-            <ItineraryCanvas itinerary={itinerary} />
+        {activeView === 'admin' && (
+          <section className="admin-panel">
+            <AdminDashboard />
           </section>
         )}
       </main>

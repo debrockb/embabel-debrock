@@ -10,10 +10,10 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/matoe
       SPRING_DATASOURCE_USERNAME: matoe_user
       SPRING_DATASOURCE_PASSWORD: matoe_password
-      SPRING_JPA_HIBERNATE_DDL_AUTO: none
       JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx4G -Xms2G"
       # LLM API keys
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
@@ -41,15 +41,13 @@ services:
           memory: 2G
     restart: unless-stopped
 
-  # ─── Frontend: React SPA ──────────────────────────────────────────────────
+  # ─── Frontend: React SPA (nginx serves static + reverse-proxies /api) ─────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_BASE_URL: http://localhost:8080/api
+      - "3000:80"
     depends_on:
       - backend
     networks:
@@ -142,8 +140,6 @@ services:
       POSTGRES_DB: matoe
       POSTGRES_USER: matoe_user
       POSTGRES_PASSWORD: matoe_password
-    ports:
-      - "5432:5432"
     networks:
       - matoe-network
     volumes:
@@ -158,8 +154,6 @@ services:
   # ─── Redis (session cache, rate limiting) ────────────────────────────────
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     networks:
       - matoe-network
     volumes:

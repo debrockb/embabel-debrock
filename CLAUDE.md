@@ -21,18 +21,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The system uses Embabel's Open mode where the **Orchestrator** sets a global `@Goal(description = "Plan an unforgettable trip")`. The GOAP planner fires agents in parallel when their preconditions are independent.
 
-**Agent roles:**
+**Agent roles (14 agents):**
 | Agent | Function |
 |---|---|
-| **Orchestrator** | Parses user intent, defines the goal, synthesizes the final `UnforgettableItinerary` |
-| **Country Specialist** | Provides regional travel context (transit norms, local tips) |
-| **Hotel Agent** | Scrapes/calls aggregator APIs for hotel data |
-| **B&B Agent** | Extracts guesthouse/boutique data |
+| **Orchestrator** | Synthesizes 3-tier itinerary variants (Budget/Standard/Luxury) with day-by-day breakdowns |
+| **Country Specialist** | Provides regional travel context (transit norms, local tips, visa, emergency) |
+| **Hotel Agent** | Searches Booking.com, Hotels.com, Expedia via browser-use + LLM fallback |
+| **B&B Agent** | Searches B&Bs and guesthouses |
 | **Apartment Agent** | Searches short-term rentals by guest count |
+| **Hostel Agent** | Budget accommodation search |
 | **Flight Agent** | Finds air routes (fastest + cheapest) |
 | **Car/Bus Agent** | Finds ground transit (rentals, coach options) |
+| **Train Agent** | Train route search |
+| **Ferry Agent** | Ferry route search |
+| **Attractions Agent** | Finds attractions/experiences via Viator, GetYourGuide |
+| **Weather Agent** | Weather forecast for trip dates |
+| **Currency Agent** | Currency info, exchange rates, tipping customs |
+| **Review Summary Agent** | Traveller review sentiment synthesis |
 
-A final `@AchievesGoal` method compiles `List<AccommodationOption>` + `List<TransportOption>` into an `UnforgettableItinerary`.
+The Orchestrator uses a cloud LLM to synthesize all gathered data into 3 `ItineraryVariant` objects (Budget, Standard, Luxury), each with `ItineraryDay` breakdowns.
 
 ### Multi-LLM Routing
 
@@ -113,7 +120,8 @@ The application uses:
 - **Spring context-path:** `/api` — all endpoints are prefixed with `/api` (e.g., `/api/travel/health`)
 - **Virtual Threads:** Automatically enabled via `spring.threads.virtual.enabled=true` in `application.yml`
 - **Default database:** SQLite (`./data/matoe.db`) for local development
-- **Frontend proxy:** Points to `http://localhost:8080/api` when running separately
+- **Frontend proxy:** `package.json` proxy points to `http://localhost:8080` for dev; nginx reverse-proxy in Docker
+- **Admin dashboard:** `/api/admin/prompts`, `/api/admin/costs`, `/api/admin/search-targets` — accessible via "Admin" tab in frontend
 
 ## Build & Run (Docker Compose)
 
@@ -188,38 +196,45 @@ curl -X POST http://localhost:8080/api/travel/plan \
 
 ```text
 src/main/java/com/matoe/
-├── MATOEApplication.java           # Spring Boot entry point
+├── MATOEApplication.java               # Spring Boot entry point
+├── config/CorsConfig.java              # CORS configuration
 ├── controller/
-│   └── TravelController.java       # REST endpoints (/travel/plan, /travel/health)
+│   ├── TravelController.java           # REST endpoints (/travel/plan, /travel/health, SSE)
+│   └── AdminController.java            # Admin API (prompts, costs, search targets)
 ├── service/
-│   └── TravelService.java          # Orchestration logic, agent coordination
-├── agents/
-│   ├── OrchestratorAgent.java      # @Goal setter, itinerary synthesis
-│   ├── HotelAgent.java             # @Action to scrape hotel aggregators
-│   ├── BBAgent.java                # @Action for B&B/guesthouse extraction
-│   ├── ApartmentAgent.java         # @Action for short-term rentals
-│   ├── FlightAgent.java            # @Action for flight searches
-│   ├── CarBusAgent.java            # @Action for ground transport
-│   └── CountrySpecialistAgent.java # @Action for regional context
-└── domain/
-    ├── TravelRequest.java          # User input model (destination, dates, budget)
-    ├── AccommodationOption.java    # Structured hotel/B&B/apartment result
-    ├── TransportOption.java        # Structured flight/car/bus result
-    └── UnforgettableItinerary.java # Final synthesized trip
+│   ├── TravelService.java              # Orchestration, parallel agent dispatch, persistence
+│   ├── LlmService.java                 # Multi-provider LLM routing (Anthropic/LMStudio/Ollama/OpenRouter)
+│   ├── BrowserAgentService.java        # Java client for browser-use Python service
+│   ├── AgentProgressService.java       # SSE emitter management for real-time tracking
+│   ├── PromptTemplateService.java      # {{variable}} substitution in prompt templates
+│   ├── DynamicPromptService.java       # DB-backed prompt versioning (admin can edit at runtime)
+│   └── LlmCostTrackingService.java     # Per-session cost tracking with budget ceilings
+├── agents/                              # 14 specialist agents
+│   ├── OrchestratorAgent.java          # LLM synthesis → 3 ItineraryVariants + day-by-day
+│   ├── HotelAgent.java, BBAgent.java, ApartmentAgent.java, HostelAgent.java
+│   ├── FlightAgent.java, CarBusAgent.java, TrainAgent.java, FerryAgent.java
+│   ├── CountrySpecialistAgent.java, AttractionsAgent.java
+│   ├── WeatherAgent.java, CurrencyAgent.java, ReviewSummaryAgent.java
+├── domain/
+│   ├── TravelRequest.java              # Multi-destination, interest tags, origin city
+│   ├── AccommodationOption.java        # With source provenance (browser/llm)
+│   ├── TransportOption.java            # With origin/destination fields
+│   ├── AttractionOption.java           # Attractions/experiences
+│   ├── ItineraryDay.java               # Day-by-day breakdown
+│   ├── ItineraryVariant.java           # Budget/Standard/Luxury variant
+│   └── UnforgettableItinerary.java     # Full itinerary with variants, weather, currency
+├── entity/                              # JPA entities
+│   ├── ItineraryEntity.java, PromptVersionEntity.java
+│   ├── LlmCostLogEntity.java, SearchTargetEntity.java
+└── repository/                          # Spring Data JPA repositories
 
-src/main/resources/
-├── application.yml                 # Spring config, model defaults, prompts
-└── db/migration/                   # Flyway migration scripts (V1_*.sql, etc.)
-
-frontend/
-├── src/
-│   ├── App.js                      # Main React component
-│   ├── components/
-│   │   ├── MissionControl.js       # Destination/budget/model selection UI
-│   │   ├── LiveAgentTracker.js     # Real-time agent status display
-│   │   └── ItineraryCanvas.js      # Final trip display & user feedback
-│   └── index.js                    # React root
-└── package.json                    # Dependencies, npm scripts
+frontend/src/
+├── App.js                               # Main app with planner + admin tabs
+├── components/
+│   ├── MissionControl.js                # Trip form (origin, interests, transport types, LLM config)
+│   ├── LiveAgentTracker.js              # Real-time SSE agent progress (14 agents)
+│   ├── ItineraryCanvas.js               # Variants, day-by-day, weather, currency, attractions
+│   └── AdminDashboard.js               # Prompt editor, cost monitoring, search target mgmt
 ```
 
 ## Configuration Structure (application.yml)
@@ -378,23 +393,29 @@ Accommodations and transport are tiered by `TravelService.tierAccommodations()` 
 3. Inject the `Ai` client in the agent using `@AiClient` or dynamic routing
 4. Update the TravelController to accept the provider selection from frontend
 
-### Frontend Real-Time Updates (Future)
+### Frontend Real-Time Updates (Implemented)
 
-Currently using mock agent status in `App.js`. To integrate real SSE/WebSocket:
+SSE streaming is fully implemented:
+- `AgentProgressService` manages `SseEmitter` connections per session
+- `TravelService.planTrip()` broadcasts agent progress events during execution
+- Frontend subscribes via `EventSource` to `/api/travel/progress/{sessionId}`
+- `LiveAgentTracker.js` displays real-time status for all 14 agents
 
-1. Add `@RestController` endpoint that emits `SseEmitter` or WebSocket messages
-2. Update `TravelService.planTrip()` to broadcast agent progress
-3. Frontend subscribes via `EventSource` (SSE) or WebSocket client
-4. Update `LiveAgentTracker.js` to listen to real events
+### Database Persistence (Implemented)
 
-### Database Persistence (Future)
+Itineraries are persisted in SQLite (local) or PostgreSQL (Docker):
+- `ItineraryEntity` stores all data including JSON columns for nested collections
+- `PromptVersionEntity` stores prompt version history for admin rollback
+- `LlmCostLogEntity` tracks every LLM call with token counts and cost estimates
+- `SearchTargetEntity` stores configurable search sites per agent
+- Flyway migrations run automatically on startup (`V1__init.sql`)
 
-Currently `itineraryHistory` is in-memory (lost on restart). To persist:
+### Admin Dashboard (Implemented)
 
-1. Create JPA entities mapping to domain models
-2. Create `ItineraryRepository` extending `JpaRepository`
-3. Replace in-memory list with DB queries in `TravelService`
-4. Run migrations via Flyway (scripts go in `src/main/resources/db/migration/`)
+Runtime configuration without recompilation:
+- **Prompt Editor** at `/api/admin/prompts/{agentName}` — POST to save new version, version history with rollback
+- **Cost Monitoring** at `/api/admin/costs` — spending by agent, model, and session
+- **Search Targets** at `/api/admin/search-targets` — enable/disable sites per agent
 
 ## Common Patterns
 

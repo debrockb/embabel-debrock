@@ -194,7 +194,7 @@ public class LlmService {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     /** Resolves shorthand like "anthropic/claude-opus-4-6" → full Anthropic model ID. */
-    private String resolveAnthropicModel(String modelString) {
+    String resolveAnthropicModel(String modelString) {
         String lower = modelString.toLowerCase();
         if (lower.contains("opus-4-6") || lower.contains("opus4"))   return "claude-opus-4-6";
         if (lower.contains("sonnet-4-6") || lower.contains("sonnet4")) return "claude-sonnet-4-6";
@@ -206,7 +206,7 @@ public class LlmService {
     }
 
     /** Strips "provider/" prefix from a model string. */
-    private String stripPrefix(String modelString) {
+    String stripPrefix(String modelString) {
         int slash = modelString.indexOf('/');
         return slash >= 0 ? modelString.substring(slash + 1) : modelString;
     }
