@@ -1,0 +1,107 @@
+spring:
+  application:
+    name: matoe
+  jpa:
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    show-sql: false
+  datasource:
+    url: jdbc:sqlite:./data/matoe.db
+    driver-class-name: org.sqlite.JDBC
+  threads:
+    virtual:
+      enabled: true
+  web:
+    cors:
+      allowed-origins: "*"
+      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+      allowed-headers: "*"
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+travel-agency:
+  models:
+    default-orchestrator: "anthropic/claude-3-5-sonnet"
+    default-extractor: "lmstudio/llama-3-8b"
+    country-specialist: "lmstudio/llama-3-8b"
+
+  prompts:
+    orchestrator: |
+      You are an elite travel agent orchestrating a multi-agent system to plan unforgettable trips.
+      Synthesize accommodation and transport options into 3 itinerary variants (Budget, Standard, Luxury).
+      Return a JSON object with all details and day-by-day breakdown.
+
+    hotel-agent: |
+      Find hotels matching the criteria. For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+
+    bb-agent: |
+      Find bed-and-breakfasts and charming guesthouses. For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+
+    apartment-agent: |
+      Find holiday apartments and short-term rentals suitable for {{guestCount}} guests. For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+
+    flight-agent: |
+      Find flights for {{guestCount}} passengers. For each return: airline, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl.
+      Price is per person. Return ONLY valid JSON array.
+
+    car-bus-agent: |
+      Find ground transport (car rental or bus). For each return: type (car or bus), provider, departureTime, arrivalTime, duration, price (total trip), bookingUrl.
+      Return ONLY valid JSON array.
+
+    country-specialist: |
+      You are a regional travel expert. Provide travel intelligence for {{destination}} as a JSON object with keys:
+      bestTimeToVisit, localTransitRecommendation, culturalTips, safetyConsiderations, currency, language.
+      Return ONLY valid JSON, no explanation.
+
+  web-scraping:
+    user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    timeout-seconds: 30
+    max-concurrent-scrapes: 50
+    proxy-enabled: false
+    proxy-list: []
+
+anthropic:
+  api:
+    key: ${ANTHROPIC_API_KEY:}
+    model: claude-3-5-sonnet-20241022
+    base-url: https://api.anthropic.com
+    version: 2023-06-01
+
+lmstudio:
+  base-url: ${LMSTUDIO_BASE_URL:http://localhost:1234/v1}
+
+ollama:
+  base-url: ${OLLAMA_BASE_URL:http://localhost:11434/v1}
+
+openrouter:
+  api-key: ${OPENROUTER_API_KEY:}
+  base-url: https://openrouter.ai/api/v1
+
+browser-service:
+  url: ${BROWSER_SERVICE_URL:http://localhost:8001}
+  timeout-seconds: 120
+  enabled: ${BROWSER_SERVICE_ENABLED:true}
+
+travel-agency:
+  browser:
+    hotel-sites: "booking.com,hotels.com,expedia.com"
+    bb-sites: "booking.com,airbnb.com,bedandbreakfast.com"
+    apartment-sites: "airbnb.com,vrbo.com,booking.com"
+    flight-sites: "skyscanner.com,google.com/flights,kayak.com"
+    car-bus-sites: "rentalcars.com,rome2rio.com,busbud.com"
+    country-sites: "lonelyplanet.com,tripadvisor.com,wikitravel.org"
+
+logging:
+  level:
+    root: INFO
+    com.matoe: DEBUG

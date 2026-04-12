@@ -1,0 +1,351 @@
+.itinerary-canvas {
+  width: 100%;
+}
+
+.itinerary-canvas h2 {
+  color: #333;
+  margin-bottom: 2rem;
+  font-size: 1.5rem;
+}
+
+.itinerary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea20, #764ba220);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.destination-info h3 {
+  font-size: 1.8rem;
+  color: #333;
+  margin: 0 0 0.5rem 0;
+}
+
+.destination-info p {
+  color: #666;
+  margin: 0;
+}
+
+.trip-cost {
+  text-align: right;
+}
+
+.cost-label {
+  display: block;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.trip-cost h4 {
+  color: #667eea;
+  font-size: 2rem;
+  margin: 0;
+}
+
+.insights-section,
+.accommodations-section,
+.transport-section {
+  margin-bottom: 2.5rem;
+}
+
+.insights-section h3,
+.section-title {
+  color: #333;
+  font-size: 1.3rem;
+  margin-bottom: 1.5rem;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.section-title:hover {
+  color: #667eea;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.insight-card {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.insight-label {
+  display: block;
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin-bottom: 0.5rem;
+}
+
+.insight-value {
+  display: block;
+  color: #333;
+  font-weight: 500;
+}
+
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.option-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.option-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+.option-card.budget {
+  border-left: 4px solid #4caf50;
+}
+
+.option-card.standard {
+  border-left: 4px solid #2196f3;
+}
+
+.option-card.luxury {
+  border-left: 4px solid #ff9800;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.card-header h4 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+  flex: 1;
+}
+
+.tier-badge {
+  padding: 0.25rem 0.75rem;
+  background: #f0f0f0;
+  color: #666;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 1rem;
+}
+
+.option-card.budget .tier-badge {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.option-card.standard .tier-badge {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.option-card.luxury .tier-badge {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.location {
+  color: #666;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.type {
+  color: #666;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.details {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.rating {
+  display: inline-block;
+}
+
+.price {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.stops {
+  color: #ff9800;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+
+.amenities {
+  color: #999;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+  line-height: 1.4;
+}
+
+.book-btn {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.2s;
+}
+
+.book-btn:hover {
+  transform: translateY(-2px);
+}
+
+.itinerary-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.action-btn {
+  padding: 1rem 2rem;
+  background: white;
+  border: 2px solid #667eea;
+  color: #667eea;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.action-btn:hover {
+  background: #667eea;
+  color: white;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.compare-btn {
+  padding: 0.35rem 0.85rem;
+  background: white;
+  border: 1.5px solid #667eea;
+  color: #667eea;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.compare-btn:hover,
+.compare-btn.active {
+  background: #667eea;
+  color: white;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.compare-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.compare-tier-header {
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.compare-tier-header.budget {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.compare-tier-header.standard {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.compare-tier-header.luxury {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.download-btn {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.download-btn:hover {
+  background: #5a6fd8;
+  border-color: #5a6fd8;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .itinerary-header {
+    flex-direction: column;
+    text-align: left;
+  }
+
+  .trip-cost {
+    text-align: left;
+    margin-top: 1.5rem;
+  }
+
+  .items-grid,
+  .compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .itinerary-actions {
+    flex-direction: column;
+  }
+}

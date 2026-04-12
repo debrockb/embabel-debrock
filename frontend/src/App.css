@@ -1,0 +1,98 @@
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+}
+
+.app-header {
+  text-align: center;
+  color: white;
+  margin-bottom: 3rem;
+}
+
+.app-header h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.app-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.app-main {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.control-panel,
+.tracker-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.itinerary-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 1024px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.error-banner {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  color: #c62828;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.error-banner button {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #c62828;
+  color: #c62828;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.error-banner button:hover {
+  background: #c62828;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .app {
+    padding: 1rem;
+  }
+
+  .app-header h1 {
+    font-size: 2rem;
+  }
+
+  .control-panel,
+  .tracker-panel {
+    padding: 1.5rem;
+  }
+}

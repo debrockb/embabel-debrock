@@ -1,0 +1,50 @@
+# Gradle
+.gradle/
+build/
+*.jar
+*.zip
+
+# Java
+*.class
+*.log
+target/
+.classpath
+.project
+.settings/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log
+
+# Database
+*.db
+*.sqlite
+data/
+postgres_data/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

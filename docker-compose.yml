@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+
+  # ─── Backend: Spring Boot + Embabel Agent ─────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/matoe
+      SPRING_DATASOURCE_USERNAME: matoe_user
+      SPRING_DATASOURCE_PASSWORD: matoe_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx4G -Xms2G"
+      # LLM API keys
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Local LLM endpoints
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Browser service load-balanced via nginx
+      BROWSER_SERVICE_URL: http://browser-lb:80
+    depends_on:
+      postgres:
+        condition: service_healthy
+      browser-lb:
+        condition: service_started
+    networks:
+      - matoe-network
+    volumes:
+      - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    restart: unless-stopped
+
+  # ─── Frontend: React SPA ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_BASE_URL: http://localhost:8080/api
+    depends_on:
+      - backend
+    networks:
+      - matoe-network
+    restart: unless-stopped
+
+  # ─── Browser-Use Service (instance 1) ────────────────────────────────────
+  browser-1:
+    build:
+      context: ./browser_service
+      dockerfile: Dockerfile
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      BROWSER_HEADLESS: "true"
+      LOG_LEVEL: INFO
+    networks:
+      - matoe-network
+    shm_size: '2gb'           # Chromium needs shared memory
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+
+  # ─── Browser-Use Service (instance 2) ────────────────────────────────────
+  browser-2:
+    build:
+      context: ./browser_service
+      dockerfile: Dockerfile
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      BROWSER_HEADLESS: "true"
+      LOG_LEVEL: INFO
+    networks:
+      - matoe-network
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+
+  # ─── Browser-Use Service (instance 3) ────────────────────────────────────
+  browser-3:
+    build:
+      context: ./browser_service
+      dockerfile: Dockerfile
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      BROWSER_HEADLESS: "true"
+      LOG_LEVEL: INFO
+    networks:
+      - matoe-network
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+
+  # ─── Nginx load balancer across browser instances ─────────────────────────
+  browser-lb:
+    image: nginx:alpine
+    volumes:
+      - ./browser_service/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - browser-1
+      - browser-2
+      - browser-3
+    networks:
+      - matoe-network
+    restart: unless-stopped
+
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: matoe
+      POSTGRES_USER: matoe_user
+      POSTGRES_PASSWORD: matoe_password
+    ports:
+      - "5432:5432"
+    networks:
+      - matoe-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matoe_user -d matoe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Redis (session cache, rate limiting) ────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - matoe-network
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+networks:
+  matoe-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
