@@ -63,7 +63,7 @@ public class PdfExportService {
             .setFontSize(32).setFontColor(HEADING_COLOR).setBold());
         doc.add(new Paragraph(it.startDate() + " → " + it.endDate())
             .setFontSize(14).setFontColor(MUTED_COLOR));
-        doc.add(new Paragraph(it.guestCount() + " guest(s) · est. total $" +
+        doc.add(new Paragraph(it.guestCount() + " guest(s) · est. total €" +
             String.format("%.0f", it.totalEstimatedCost())));
         if (it.createdAt() != null) {
             doc.add(new Paragraph("Generated " + it.createdAt())
@@ -90,7 +90,7 @@ public class PdfExportService {
             t.addCell(cell(a.location()));
             t.addCell(cell(a.type()));
             t.addCell(cell(a.tier()));
-            t.addCell(cell("$" + String.format("%.0f", a.pricePerNight())));
+            t.addCell(cell("€" + String.format("%.0f", a.pricePerNight())));
             t.addCell(sourceCell(a.source()));
         }
         doc.add(t);
@@ -108,7 +108,7 @@ public class PdfExportService {
             t.addCell(cell((tr.origin() != null ? tr.origin() : "?") + " → "
                 + (tr.destination() != null ? tr.destination() : "?")));
             t.addCell(cell(tr.duration()));
-            t.addCell(cell("$" + String.format("%.0f", tr.price())));
+            t.addCell(cell("€" + String.format("%.0f", tr.price())));
             t.addCell(sourceCell(tr.source()));
         }
         doc.add(t);
@@ -118,7 +118,7 @@ public class PdfExportService {
         if (variants == null || variants.isEmpty()) return;
         heading(doc, "3-Tier Variants");
         for (ItineraryVariant v : variants) {
-            doc.add(new Paragraph(safe(v.tier()).toUpperCase() + " — $"
+            doc.add(new Paragraph(safe(v.tier()).toUpperCase() + " — €"
                 + String.format("%.0f", v.totalEstimatedCost()))
                 .setFontSize(14).setFontColor(HEADING_COLOR).setBold());
             if (v.highlights() != null && !v.highlights().isEmpty()) {
@@ -153,7 +153,7 @@ public class PdfExportService {
         for (AttractionOption a : list) {
             doc.add(new Paragraph(safe(a.name())).setBold());
             doc.add(new Paragraph(safe(a.description())).setFontColor(MUTED_COLOR));
-            doc.add(new Paragraph(String.format("  %s · $%.0f · %s · %s",
+            doc.add(new Paragraph(String.format("  %s · €%.0f · %s · %s",
                 safe(a.category()), a.price(), safe(a.duration()), safe(a.location())))
                 .setFontSize(10));
             if ("llm".equalsIgnoreCase(a.source())) {

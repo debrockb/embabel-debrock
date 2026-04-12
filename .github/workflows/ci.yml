@@ -70,6 +70,11 @@ jobs:
         run: docker compose config --quiet
 
       - name: Validate docker-compose.portainer.yml
+        # The portainer stack intentionally makes MATOE_ADMIN_TOKEN a required
+        # env var (backend refuses to start without it). For CI validation we
+        # inject a dummy value just to let `compose config` parse the file.
+        env:
+          MATOE_ADMIN_TOKEN: ci-dummy-token
         run: docker compose -f docker-compose.portainer.yml config --quiet
 
   python-lint:

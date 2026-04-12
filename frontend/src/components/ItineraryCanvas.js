@@ -226,7 +226,8 @@ function ItineraryCanvas({ itinerary }) {
                   {attr.tags?.length > 0 && (
                     <div className="tags">{attr.tags.map((t, i) => <span key={i} className="tag">{t}</span>)}</div>
                   )}
-                  {attr.bookingUrl && (
+                  {attr.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
+                  {attr.bookingUrl && attr.source !== 'llm' && (
                     <a href={attr.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
                   )}
                 </div>

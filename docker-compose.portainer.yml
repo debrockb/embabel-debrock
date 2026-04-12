@@ -9,6 +9,22 @@
 ##   ghcr.io/debrockb/embabel-debrock-frontend:${MATOE_IMAGE_TAG:-latest}
 ##   ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
 ##
+## ────────────────────────────────────────────────────────────────────────────
+## GHCR PACKAGE VISIBILITY (one-time, per package)
+## ────────────────────────────────────────────────────────────────────────────
+## After the first successful workflow run, the three packages are created
+## under github.com/users/debrockb/packages/container/{backend,frontend,browser}
+## in *Private* visibility. The NAS will not be able to `docker pull` them
+## anonymously until each is flipped to *Public*:
+##
+##   1. Open https://github.com/debrockb?tab=packages
+##   2. Click each of the three embabel-debrock-* packages
+##   3. Package settings → "Change visibility" → Public
+##
+## Alternatively, keep them private and provide registry credentials to
+## Portainer: Registries → Add registry → ghcr.io with a GitHub PAT that has
+## `read:packages` scope. Images will then be pulled with those credentials.
+##
 ## REQUIRED environment variables (set in Portainer Stack settings):
 ##   MATOE_ADMIN_TOKEN   — admin API auth (REQUIRED in production; the backend
 ##                         will refuse to start if unset while profile=docker)
