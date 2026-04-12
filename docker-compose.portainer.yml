@@ -1,20 +1,24 @@
-version: '3.8'
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# M.A.T.O.E — NAS / Portainer Deployment
-# ═══════════════════════════════════════════════════════════════════════════════
-# Deploy via Portainer → Stacks → Add Stack → Repository
-#   Repository URL : https://github.com/debrockb/embabel-debrock
-#   Compose path   : docker-compose.portainer.yml
-#   Branch         : main
-#
-# LLM routing goes through the existing LLM-Proxy (port 11235) which
-# load-balances across LM Studio backends + Ollama fallback.
-# ═══════════════════════════════════════════════════════════════════════════════
+## ═══════════════════════════════════════════════════════════════════════════════
+## M.A.T.O.E — NAS / Portainer Deployment
+## ═══════════════════════════════════════════════════════════════════════════════
+## Deploy via Portainer → Stacks → Add Stack → Repository
+##   Repository URL : https://github.com/debrockb/embabel-debrock
+##   Compose path   : docker-compose.portainer.yml
+##   Branch         : main
+##
+## Required environment variables (set in Portainer Stack settings):
+##   MATOE_ADMIN_TOKEN   — required for admin API write access
+##
+## Optional (for cloud LLMs):
+##   ANTHROPIC_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY
+##
+## For local LLMs on the NAS LAN:
+##   LMSTUDIO_BASE_URL=http://192.168.1.100:1234/v1
+##   OLLAMA_BASE_URL=http://192.168.1.100:11434
+## ═══════════════════════════════════════════════════════════════════════════════
 
 services:
 
-  # ─── Backend: Spring Boot + Embabel Agent ─────────────────────────────────
   backend:
     build:
       context: .
@@ -28,17 +32,17 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://matoe-postgres:5432/matoe
       SPRING_DATASOURCE_USERNAME: matoe_user
-      SPRING_DATASOURCE_PASSWORD: matoe_password
-      JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx4G -Xms2G"
-      # ── LLM: route everything through the existing LLM-Proxy ──
-      LMSTUDIO_BASE_URL: http://host.docker.internal:11235/v1
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
-      # Cloud keys left blank — local LLMs only
-      OPENROUTER_API_KEY: ""
-      OPENAI_API_KEY: ""
-      ANTHROPIC_API_KEY: ""
-      # Browser service load-balanced via nginx
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-matoe_password}
+      JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx2G -Xms1G"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       BROWSER_SERVICE_URL: http://matoe-browser-lb:80
+      BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-true}
+      MATOE_ADMIN_TOKEN: ${MATOE_ADMIN_TOKEN:-}
+      MATOE_CORS_ORIGINS: ${MATOE_CORS_ORIGINS:-http://localhost:3080,http://localhost:80}
     depends_on:
       matoe-postgres:
         condition: service_healthy
@@ -51,12 +55,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-        reservations:
           memory: 2G
+        reservations:
+          memory: 1G
     restart: unless-stopped
 
-  # ─── Frontend: React SPA (nginx serves static + reverse-proxies /api) ─────
   frontend:
     build:
       context: ./frontend
@@ -70,7 +73,6 @@ services:
       - matoe-network
     restart: unless-stopped
 
-  # ─── Browser-Use Service (instance 1) ────────────────────────────────────
   browser-1:
     build:
       context: ./browser_service
@@ -79,12 +81,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      # Browser-use needs a capable LLM for web reasoning — route via proxy
-      ANTHROPIC_API_KEY: ""
-      OPENAI_API_KEY: ""
-      OPENROUTER_API_KEY: ""
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
-      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
     networks:
@@ -93,10 +94,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1G
     restart: unless-stopped
 
-  # ─── Browser-Use Service (instance 2) ────────────────────────────────────
   browser-2:
     build:
       context: ./browser_service
@@ -105,11 +105,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      ANTHROPIC_API_KEY: ""
-      OPENAI_API_KEY: ""
-      OPENROUTER_API_KEY: ""
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
-      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
     networks:
@@ -118,10 +118,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1G
     restart: unless-stopped
 
-  # ─── Browser-Use Service (instance 3) ────────────────────────────────────
   browser-3:
     build:
       context: ./browser_service
@@ -130,11 +129,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      ANTHROPIC_API_KEY: ""
-      OPENAI_API_KEY: ""
-      OPENROUTER_API_KEY: ""
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
-      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-3}
+      MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
     networks:
@@ -143,10 +142,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1G
     restart: unless-stopped
 
-  # ─── Nginx load balancer across browser instances ─────────────────────────
   matoe-browser-lb:
     image: nginx:alpine
     container_name: MATOE-Browser-LB
@@ -160,14 +158,13 @@ services:
       - matoe-network
     restart: unless-stopped
 
-  # ─── PostgreSQL ───────────────────────────────────────────────────────────
   matoe-postgres:
     image: postgres:16-alpine
     container_name: MATOE-Postgres
     environment:
       POSTGRES_DB: matoe
       POSTGRES_USER: matoe_user
-      POSTGRES_PASSWORD: matoe_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-matoe_password}
     networks:
       - matoe-network
     volumes:
@@ -179,7 +176,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Redis (session cache, rate limiting) ────────────────────────────────
   matoe-redis:
     image: redis:7-alpine
     container_name: MATOE-Redis

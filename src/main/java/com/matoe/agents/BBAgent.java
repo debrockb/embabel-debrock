@@ -9,6 +9,7 @@ import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
 import com.matoe.service.LlmService;
 import com.matoe.service.PromptTemplateService;
+import com.matoe.service.SearchTargetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class BBAgent {
     private final PromptTemplateService promptTemplateService;
     private final DynamicPromptService dynamicPromptService;
     private final LlmCostTrackingService costTracker;
+    private final SearchTargetService searchTargetService;
 
     @Value("${travel-agency.prompts.bb-agent}")
     private String defaultPrompt;
@@ -42,13 +44,15 @@ public class BBAgent {
 
     public BBAgent(BrowserAgentService browserService, LlmService llmService,
                    ObjectMapper objectMapper, PromptTemplateService promptTemplateService,
-                   DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker) {
+                   DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker,
+                   SearchTargetService searchTargetService) {
         this.browserService = browserService;
         this.llmService = llmService;
         this.objectMapper = objectMapper;
         this.promptTemplateService = promptTemplateService;
         this.dynamicPromptService = dynamicPromptService;
         this.costTracker = costTracker;
+        this.searchTargetService = searchTargetService;
         // Register YAML default (DB version will override if set by admin)
         dynamicPromptService.registerDefault("bb-agent", "");
     }
@@ -67,7 +71,7 @@ public class BBAgent {
             try {
                 List<Map<String, Object>> raw = browserService.browseForList(
                     buildBrowserTask(request, nights),
-                    Arrays.asList(bbSites.split(",")),
+                    searchTargetService.getSites("bb-agent", bbSites),
                     "a JSON array of B&B objects each with: name, pricePerNight (number), " +
                     "totalPrice (number), rating (number 1-5), location (string), " +
                     "amenities (array of strings), bookingUrl (string)",

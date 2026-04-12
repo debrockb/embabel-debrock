@@ -9,6 +9,7 @@ import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
 import com.matoe.service.LlmService;
 import com.matoe.service.PromptTemplateService;
+import com.matoe.service.SearchTargetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class AttractionsAgent {
     private final PromptTemplateService promptTemplateService;
     private final DynamicPromptService dynamicPromptService;
     private final LlmCostTrackingService costTracker;
+    private final SearchTargetService searchTargetService;
 
     @Value("${travel-agency.prompts.attractions-agent}")
     private String defaultPrompt;
@@ -43,13 +45,15 @@ public class AttractionsAgent {
 
     public AttractionsAgent(BrowserAgentService browserService, LlmService llmService,
                             ObjectMapper objectMapper, PromptTemplateService promptTemplateService,
-                            DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker) {
+                            DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker,
+                            SearchTargetService searchTargetService) {
         this.browserService = browserService;
         this.llmService = llmService;
         this.objectMapper = objectMapper;
         this.promptTemplateService = promptTemplateService;
         this.dynamicPromptService = dynamicPromptService;
         this.costTracker = costTracker;
+        this.searchTargetService = searchTargetService;
     }
 
     @PostConstruct
@@ -68,7 +72,7 @@ public class AttractionsAgent {
             try {
                 List<Map<String, Object>> raw = browserService.browseForList(
                     buildBrowserTask(request, interestTags),
-                    Arrays.asList(attractionSites.split(",")),
+                    searchTargetService.getSites("attractions-agent", attractionSites),
                     "a JSON array of attraction objects each with: name, description, category, " +
                     "price (number in USD), duration (string like '2h' or 'half-day'), " +
                     "rating (number 1-5), location (string), bookingUrl (string), tags (array of strings)",

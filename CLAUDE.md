@@ -4,485 +4,351 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**M.A.T.O.E** (Multi-Agent Travel Orchestration Engine) — a multi-agent system that takes user travel parameters (destination, dates, budget) and deploys specialized AI agents to concurrently search, compare, and synthesize accommodations and transport into a final itinerary.
+**M.A.T.O.E** (Multi-Agent Travel Orchestration Engine) — a multi-agent system that deploys 14 specialized AI agents to concurrently search, compare, and synthesize travel accommodations, transport, and attractions into 3-tier itinerary variants (Budget, Standard, Luxury) with day-by-day breakdowns.
+
+**GitHub:** https://github.com/debrockb/embabel-debrock
+**Target deployment:** Docker Compose on a NAS (Portainer), 16GB RAM constraint.
 
 ## Tech Stack
 
-- **Backend:** Spring Boot on Java 21+ (required for Virtual Threads / Project Loom)
-- **Agent Framework:** [Embabel](https://embabel.com) — provides GOAP (Goal-Oriented Action Planning), `@Action`/`@Goal`/`@AchievesGoal` annotations, and dynamic LLM routing
-- **Frontend:** SPA (React, Svelte, or Vue) communicating via REST + SSE/WebSockets
-- **Database:** SQLite or PostgreSQL for agent states, past itineraries, cached results
-- **Deployment:** Docker Compose on local NAS
-- **Web Scraping:** Playwright Java (headless browser), rotating proxy pool, exponential backoff
+- **Backend:** Spring Boot 3.2 on Java 21+ (Virtual Threads / Project Loom)
+- **Agent Framework:** [Embabel Agent 0.3.5](https://github.com/embabel/embabel-agent) — GOAP planning, `@Agent`/`@Action`/`@AchievesGoal` annotations, `AgentPlatform`, multi-LLM routing via `Ai` interface
+- **Frontend:** React 18 SPA with real-time SSE agent progress tracking
+- **Database:** SQLite (local dev), PostgreSQL (Docker) — separate Flyway migrations per DB
+- **Web Scraping:** [browser-use](https://github.com/browser-use/browser-use) Python service with Chromium, load-balanced by nginx
+- **Deployment:** Docker Compose with backend, frontend (nginx), browser service, PostgreSQL, Redis
 
-## Architecture
-
-### Agent System (Embabel Open Mode)
-
-The system uses Embabel's Open mode where the **Orchestrator** sets a global `@Goal(description = "Plan an unforgettable trip")`. The GOAP planner fires agents in parallel when their preconditions are independent.
-
-**Agent roles (14 agents):**
-| Agent | Function |
-|---|---|
-| **Orchestrator** | Synthesizes 3-tier itinerary variants (Budget/Standard/Luxury) with day-by-day breakdowns |
-| **Country Specialist** | Provides regional travel context (transit norms, local tips, visa, emergency) |
-| **Hotel Agent** | Searches Booking.com, Hotels.com, Expedia via browser-use + LLM fallback |
-| **B&B Agent** | Searches B&Bs and guesthouses |
-| **Apartment Agent** | Searches short-term rentals by guest count |
-| **Hostel Agent** | Budget accommodation search |
-| **Flight Agent** | Finds air routes (fastest + cheapest) |
-| **Car/Bus Agent** | Finds ground transit (rentals, coach options) |
-| **Train Agent** | Train route search |
-| **Ferry Agent** | Ferry route search |
-| **Attractions Agent** | Finds attractions/experiences via Viator, GetYourGuide |
-| **Weather Agent** | Weather forecast for trip dates |
-| **Currency Agent** | Currency info, exchange rates, tipping customs |
-| **Review Summary Agent** | Traveller review sentiment synthesis |
-
-The Orchestrator uses a cloud LLM to synthesize all gathered data into 3 `ItineraryVariant` objects (Budget, Standard, Luxury), each with `ItineraryDay` breakdowns.
-
-### Multi-LLM Routing
-
-The system dynamically routes between local and cloud LLMs:
-- **Local (cheap tasks):** LM Studio (`http://<ip>:1234/v1`, OpenAI-compatible), Ollama (via `embabel-agent-starter-ollama`)
-- **Cloud (complex tasks):** Anthropic, OpenAI, OpenRouter — authenticated via env vars (`OPENROUTER_API_KEY`, etc.)
-
-Model selection happens at two levels:
-1. **Config-level defaults** in `application.yml` under `travel-agency.models.*`
-2. **Per-request override** — the `TravelRequest` payload includes user-selected models, and the `@Action` method dynamically constructs the `Ai` client
-
-### Concurrency Model
-
-Java Virtual Threads (Project Loom) enable thousands of concurrent scraping threads without exhausting NAS memory. Accommodation agents and transport agents run in parallel since their preconditions are independent.
-
-### Frontend Modules
-
-1. **Mission Control Dashboard** — destination, dates, budget, travel style inputs; LLM provider/model selection dropdowns
-2. **Live Agent Tracker** — real-time SSE feed showing agent status (deployed, scraping, extracted)
-3. **Interactive Itinerary Canvas** — displays the final itinerary; user can reject individual components to trigger targeted agent re-runs
-4. **Prompt & System Settings Panel** — admin view for editing system prompts, proxy settings, API keys at runtime
-
-## Key Design Constraints
-
-- **All agent outputs must be strongly typed** — use JVM records/classes with Jackson annotations (e.g., `AccommodationResult`). No unstructured text.
-- **All prompts must be externalized** — stored in `application.yml` or DB under `travel-agency.prompts.*`, never hardcoded in Java source.
-- **Zero recompilation for config changes** — model selection, prompts, proxy settings, and API keys must all be changeable at runtime.
-- **Budget tiering is mandatory** — agents categorize results into user-defined tiers (Budget, Standard, Luxury).
-- **NAS-safe resource limits** — JVM container must have strict memory caps (e.g., `deploy.resources.limits.memory: 4G`) to prevent OOM on the host.
-- **Docker networking must resolve local IPs** — the container needs network bridging to reach LM Studio/Ollama on other machines on the LAN.
-
-## Local Development Setup
-
-### Prerequisites
-
-- **Java 21+** (required for Virtual Threads / Project Loom)
-- **Node.js 16+** (for frontend development)
-- **.env file** — copy from `.env.example` and configure:
-
-  ```bash
-  cp .env.example .env
-  ```
-
-  - API keys are optional; if omitted, local LLM services (LM Studio/Ollama) will be used
-  - Database URL can stay as SQLite default for local development
-  - `LMSTUDIO_BASE_URL` and `OLLAMA_BASE_URL` must match your local service IPs on the LAN
-
-### Running Locally (without Docker)
-
-**Backend:**
-```bash
-# Run backend locally (requires Java 21+)
-./gradlew bootRun
-
-# Run all tests
-./gradlew test
-
-# Run a single test class
-./gradlew test --tests com.matoe.agents.HotelAgentTest
-
-# Run a specific test method
-./gradlew test --tests com.matoe.agents.HotelAgentTest.testExtractPrices
-
-# Build JAR without running tests
-./gradlew build -x test
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev  # Starts dev server on http://localhost:3000
-npm test     # Runs tests in watch mode (press 'a' to run all tests once)
-```
-
-The application uses:
-
-- **Spring context-path:** `/api` — all endpoints are prefixed with `/api` (e.g., `/api/travel/health`)
-- **Virtual Threads:** Automatically enabled via `spring.threads.virtual.enabled=true` in `application.yml`
-- **Default database:** SQLite (`./data/matoe.db`) for local development
-- **Frontend proxy:** `package.json` proxy points to `http://localhost:8080` for dev; nginx reverse-proxy in Docker
-- **Admin dashboard:** `/api/admin/prompts`, `/api/admin/costs`, `/api/admin/search-targets` — accessible via "Admin" tab in frontend
-
-## Build & Run (Docker Compose)
-
-For production or isolated testing, use Docker Compose (requires Docker and Docker Compose):
+## Build & Run Commands
 
 ```bash
-# Start all services (backend, frontend, PostgreSQL database)
-docker compose up -d
+# Backend
+./gradlew bootRun                    # Start (Java 21+ required)
+./gradlew test                       # All tests
+./gradlew test --tests com.matoe.domain.DomainModelTest  # Single class
+./gradlew build -x test              # Build JAR
 
-# Rebuild after code changes
-docker compose up -d --build
+# Frontend
+cd frontend && npm install && npm run dev   # Dev server on :3000
+cd frontend && npm test                     # Tests
+cd frontend && npm run build                # Production build
 
-# View logs
-docker compose logs -f backend
-docker compose logs -f frontend
-docker compose logs -f postgres
+# Docker
+docker compose up -d                 # Full stack
+docker compose up -d --build         # Rebuild
+docker compose logs -f backend       # Logs
+docker compose down -v               # Teardown + delete volumes
 
-# Stop all services
-docker compose down
-
-# Clean up volumes (deletes PostgreSQL data)
-docker compose down -v
-```
-
-**Important:** Docker Compose uses PostgreSQL (not SQLite). The backend environment variables are set in `docker-compose.yml`; API keys should be passed via environment on `docker compose` command or added to a `.env` file in the project root.
-
-## Frontend Development
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start dev server (runs on http://localhost:3000)
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm run test
-```
-
-## Testing the System
-
-**Quick health check:**
-```bash
+# Health check
 curl http://localhost:8080/api/travel/health
 ```
 
-**Test trip planning (requires backend running):**
-```bash
-curl -X POST http://localhost:8080/api/travel/plan \
-  -H "Content-Type: application/json" \
-  -d '{
-    "destination": "Paris",
-    "startDate": "2024-06-01",
-    "endDate": "2024-06-10",
-    "guestCount": 2,
-    "budgetMin": 2000,
-    "budgetMax": 5000,
-    "travelStyle": "standard",
-    "accommodationTypes": ["hotel", "bb"],
-    "transportTypes": ["flight"],
-    "orchestratorModel": "anthropic/claude-3-5-sonnet",
-    "extractorModel": "lmstudio/llama-3-8b"
-  }'
+## Architecture
+
+### Embabel GOAP Agent System
+
+The `TravelPlannerAgent` (`src/main/java/com/matoe/agents/TravelPlannerAgent.java`) is the Embabel `@Agent` class. It uses GOAP (Goal-Oriented Action Planning) where the planner chains `@Action` methods by their **parameter types** (preconditions) and **return types** (effects):
+
+```
+TravelRequest (blackboard input)
+  → gatherIntelligence(TravelRequest) → TravelIntelligence      ─┐
+  → searchAccommodations(TravelRequest) → AccommodationResults    │ parallel (all need only TravelRequest)
+  → searchTransport(TravelRequest) → TransportResults             │
+  → searchAttractions(TravelRequest) → AttractionResults         ─┘
+  → synthesize(TravelRequest, TravelIntelligence, AccommodationResults,
+               TransportResults, AttractionResults) → UnforgettableItinerary  [GOAL]
 ```
 
-## Project Structure
+Actions with independent preconditions run in parallel when `embabel.agent.platform.process-type=CONCURRENT`.
 
-```text
-src/main/java/com/matoe/
-├── MATOEApplication.java               # Spring Boot entry point
-├── config/CorsConfig.java              # CORS configuration
-├── controller/
-│   ├── TravelController.java           # REST endpoints (/travel/plan, /travel/health, SSE)
-│   └── AdminController.java            # Admin API (prompts, costs, search targets)
-├── service/
-│   ├── TravelService.java              # Orchestration, parallel agent dispatch, persistence
-│   ├── LlmService.java                 # Multi-provider LLM routing (Anthropic/LMStudio/Ollama/OpenRouter)
-│   ├── BrowserAgentService.java        # Java client for browser-use Python service
-│   ├── AgentProgressService.java       # SSE emitter management for real-time tracking
-│   ├── PromptTemplateService.java      # {{variable}} substitution in prompt templates
-│   ├── DynamicPromptService.java       # DB-backed prompt versioning (admin can edit at runtime)
-│   └── LlmCostTrackingService.java     # Per-session cost tracking with budget ceilings
-├── agents/                              # 14 specialist agents
-│   ├── OrchestratorAgent.java          # LLM synthesis → 3 ItineraryVariants + day-by-day
-│   ├── HotelAgent.java, BBAgent.java, ApartmentAgent.java, HostelAgent.java
-│   ├── FlightAgent.java, CarBusAgent.java, TrainAgent.java, FerryAgent.java
-│   ├── CountrySpecialistAgent.java, AttractionsAgent.java
-│   ├── WeatherAgent.java, CurrencyAgent.java, ReviewSummaryAgent.java
-├── domain/
-│   ├── TravelRequest.java              # Multi-destination, interest tags, origin city
-│   ├── AccommodationOption.java        # With source provenance (browser/llm)
-│   ├── TransportOption.java            # With origin/destination fields
-│   ├── AttractionOption.java           # Attractions/experiences
-│   ├── ItineraryDay.java               # Day-by-day breakdown
-│   ├── ItineraryVariant.java           # Budget/Standard/Luxury variant
-│   └── UnforgettableItinerary.java     # Full itinerary with variants, weather, currency
-├── entity/                              # JPA entities
-│   ├── ItineraryEntity.java, PromptVersionEntity.java
-│   ├── LlmCostLogEntity.java, SearchTargetEntity.java
-└── repository/                          # Spring Data JPA repositories
+**Execution paths in `TravelService`:**
+1. **Primary:** `AgentPlatform.runAgentFrom(travelPlannerAgent, ...)` — full Embabel GOAP planning
+2. **Fallback:** Direct `CompletableFuture` dispatch through `TravelPlannerAgent` methods (if AgentPlatform unavailable)
 
-frontend/src/
-├── App.js                               # Main app with planner + admin tabs
-├── components/
-│   ├── MissionControl.js                # Trip form (origin, interests, transport types, LLM config)
-│   ├── LiveAgentTracker.js              # Real-time SSE agent progress (14 agents)
-│   ├── ItineraryCanvas.js               # Variants, day-by-day, weather, currency, attractions
-│   └── AdminDashboard.js               # Prompt editor, cost monitoring, search target mgmt
+### Embabel 0.3.5 API Reference
+
+**Maven coordinates** (NOT on Maven Central — requires Embabel's Artifactory):
+```
+com.embabel.agent:embabel-agent-starter:0.3.5
+com.embabel.agent:embabel-agent-starter-anthropic:0.3.5
+com.embabel.agent:embabel-agent-starter-openai:0.3.5
+com.embabel.agent:embabel-agent-starter-ollama:0.3.5
+com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5
+com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5  (OpenRouter, Groq, etc.)
+com.embabel.agent:embabel-agent-starter-webmvc:0.3.5
+com.embabel.agent:embabel-agent-starter-observability:0.3.5
+com.embabel.agent:embabel-agent-test:0.3.5
 ```
 
-## Configuration Structure (application.yml)
+**Repositories required in build.gradle.kts:**
+```kotlin
+maven { url = uri("https://repo.embabel.com/artifactory/libs-release") }
+maven { url = uri("https://repo.embabel.com/artifactory/libs-snapshot") }
+```
 
+**Key annotations** (all in `com.embabel.agent.api.annotation`):
+
+| Annotation | Target | Key Parameters | Purpose |
+|---|---|---|---|
+| `@Agent` | Class | `name`, `description`, `planner=PlannerType.GOAP` | Marks an agent, scanned by `AgentPlatform` |
+| `@Action` | Method | `description`, `pre[]`, `post[]`, `cost`, `readOnly` | Declares a GOAP action. Parameter types = preconditions, return type = effect |
+| `@AchievesGoal` | Method | `description` | Terminal action that achieves the agent's goal |
+| `@Condition` | Method | `name` | Runtime condition check (returns boolean) |
+| `@EmbabelComponent` | Class | `scan` | Contributes actions but is not an agent itself |
+
+**Ai interface** (`com.embabel.agent.api.common.Ai`):
+```java
+ai.withLlm("model-name")           // by model ID
+ai.withLlmByRole("orchestrator")   // by configured role
+ai.withDefaultLlm()                // platform default
+ai.withFirstAvailableLlmOf("a","b") // fallback chain
+// Returns PromptRunner with: generateText(), createObject(), evaluateCondition()
+```
+
+**OperationContext** — injected into `@Action` methods as a parameter:
+```java
+@Action
+public MyResult doWork(MyInput input, OperationContext ctx) {
+    return ctx.ai().withLlm("gpt-4.1").createObject("prompt", MyResult.class);
+}
+```
+
+**AgentPlatform** — injected as Spring bean (`@Autowired(required=false)` for graceful fallback):
+```java
+agentPlatform.runAgentFrom(agent, processOptions, Map.of("key", value))
+process.run()           // run to completion
+process.resultOfType(UnforgettableItinerary.class)  // typed result
+```
+
+**LLM config** in application.yml:
 ```yaml
-travel-agency:
+embabel:
   models:
-    default-orchestrator: "anthropic/claude-3-5-sonnet"
-    default-extractor: "lmstudio/llama-3-8b"
-  prompts:
-    orchestrator: "You are an elite travel agent..."
-    hotel-agent: "Extract price, rating, and location from the HTML..."
+    default-llm: claude-3-5-sonnet-20241022
+    llms:
+      orchestrator: claude-3-5-sonnet-20241022
+      extractor: llama-3-8b
+  agent.platform.process-type: CONCURRENT
 ```
 
-## Environment Variables
+### Multi-LLM Routing
 
-| Variable | Required? | Purpose | Default |
-| --- | --- | --- | --- |
-| `OPENROUTER_API_KEY` | No | OpenRouter cloud LLM access | — |
-| `OPENAI_API_KEY` | No | OpenAI cloud LLM access | — |
-| `ANTHROPIC_API_KEY` | No | Anthropic cloud LLM access | — |
-| `LMSTUDIO_BASE_URL` | No | Local LM Studio endpoint | `http://localhost:1234/v1` |
-| `OLLAMA_BASE_URL` | No | Local Ollama endpoint | `http://localhost:11434` |
-| `SPRING_DATASOURCE_URL` | No* | Database connection | `jdbc:sqlite:./data/matoe.db` (local) |
-| `SPRING_DATASOURCE_USERNAME` | No* | Database user | — |
-| `SPRING_DATASOURCE_PASSWORD` | No* | Database password | — |
+The `LlmService` routes calls by model-string prefix:
 
-*Required only when using PostgreSQL in Docker; SQLite requires no authentication for local development.
+| Prefix | Provider | Endpoint |
+|---|---|---|
+| `anthropic/` | Anthropic Messages API | `anthropic.api.base-url` |
+| `lmstudio/` | LM Studio (OpenAI-compatible) | `lmstudio.base-url` |
+| `ollama/` | Ollama (OpenAI-compatible) | `ollama.base-url` |
+| `openrouter/` | OpenRouter (OpenAI-compatible) | `openrouter.base-url` |
 
-**Setup for local development:**
+Each agent reads its model from `request.extractorModel()` (cheap tasks) or `request.orchestratorModel()` (synthesis). The frontend provides dropdowns for both.
 
-```bash
-cp .env.example .env
-# Edit .env with your API keys (optional if using local LLMs only)
-# Then source it if desired: source .env
-```
+### Agent Catalogue (14 agents)
 
-For Docker, environment variables can be passed via:
+All agents follow the same pattern: `@Component`, browser-first search via `BrowserAgentService`, LLM fallback via `LlmService`, cost tracking via `LlmCostTrackingService`, provenance tagging (`source="browser"` or `source="llm"`), dynamic prompts via `DynamicPromptService`, configurable search sites via `SearchTargetService`.
 
-```bash
-# Option 1: .env file in project root (loaded automatically)
-docker compose --env-file .env up -d
+**Accommodation agents** (return `List<AccommodationOption>`):
 
-# Option 2: Override on command line
-docker compose -e ANTHROPIC_API_KEY=sk-... up -d
-```
+| Agent | Type | YAML Prompt Key | Default Sites |
+|---|---|---|---|
+| `HotelAgent` | hotel | `hotel-agent` | booking.com, hotels.com, expedia.com |
+| `BBAgent` | bb | `bb-agent` | booking.com, airbnb.com, bedandbreakfast.com |
+| `ApartmentAgent` | apartment | `apartment-agent` | airbnb.com, vrbo.com, booking.com |
+| `HostelAgent` | hostel | `hostel-agent` | hostelworld.com, booking.com |
 
-## Database Initialization
+**Transport agents** (return `List<TransportOption>`):
 
-### Local Development (SQLite)
+| Agent | Type | YAML Prompt Key | Default Sites |
+|---|---|---|---|
+| `FlightAgent` | flight | `flight-agent` | skyscanner.com, google.com/flights, kayak.com |
+| `CarBusAgent` | car/bus | `car-agent` | rentalcars.com, flixbus.com |
+| `TrainAgent` | train | `train-agent` | thetrainline.com, omio.com, seat61.com |
+| `FerryAgent` | ferry | `ferry-agent` | directferries.com, aferry.com |
 
-SQLite is the default for local development. The database file is created automatically at `./data/matoe.db` on first run.
+**Intelligence agents** (return `Map<String, Object>`):
 
-```bash
-# To reset the database during local development:
-rm -rf ./data/matoe.db
-./gradlew bootRun  # Will recreate the schema
-```
+| Agent | YAML Prompt Key | Data |
+|---|---|---|
+| `CountrySpecialistAgent` | `country-specialist` | Regional insights, visa, safety, transit |
+| `WeatherAgent` | `weather-agent` | Temperature, precipitation, packing tips |
+| `CurrencyAgent` | `currency-agent` | Exchange rates, tipping, ATM availability |
+| `ReviewSummaryAgent` | `review-summary-agent` | Sentiment, pros/cons, safety rating |
 
-### Docker (PostgreSQL)
+**Special agents:**
 
-When using `docker compose up`, a PostgreSQL database is created automatically with:
-- Database: `matoe`
-- User: `matoe_user`
-- Password: `matoe_password`
-
-Data persists in the `postgres_data` volume.
-
-```bash
-# To reset PostgreSQL data in Docker:
-docker compose down -v  # -v removes all volumes
-docker compose up -d    # Recreates fresh database
-```
-
-### Flyway Migrations
-
-Migration scripts are stored in `src/main/resources/db/migration/`. They follow Flyway naming conventions:
-- `V1__initial_schema.sql`
-- `V2__add_user_preferences.sql`
-
-Run migrations automatically:
-
-```bash
-# Migrations run on application startup
-./gradlew bootRun
-
-# Or explicitly via Gradle:
-./gradlew flywayMigrate
-```
-
-## Troubleshooting
-
-### Backend won't start
-
-**Error:** `java.net.ConnectException: Connection refused`
-
-- Check if port 8080 is already in use: `lsof -i :8080`
-- If using local LLMs (LM Studio/Ollama), verify they're running and accessible from your machine
-
-**Error:** `Could not load JDBC Driver class 'org.sqlite.JDBC'`
-
-- Ensure Java 21+ is installed: `java -version`
-- Verify Gradle dependencies are downloaded: `./gradlew build`
-
-### Frontend won't connect to backend
-
-- Check that backend is running on `http://localhost:8080/api`
-- Verify CORS is enabled in `application.yml` (should be by default)
-- Check browser console for network errors
-- In Docker, ensure both services are on the same network (`matoe-network`)
-
-### Docker container crashes with OOM
-
-- The JVM is limited to 4GB (`JAVA_TOOL_OPTIONS` in docker-compose.yml)
-- If scraping many sites concurrently, reduce `max-concurrent-scrapes` in `application.yml`
-- Monitor container memory: `docker stats`
-
-### "No LLM response" errors
-
-- If using cloud providers (Anthropic/OpenAI), verify API keys are set: `echo $ANTHROPIC_API_KEY`
-- If using local LLMs, ensure the endpoint is correct in `.env` and the service is accessible from Docker: `docker compose exec backend curl http://lmstudio:1234/v1/models` (adjust IP if on different machine)
-
-## Implementation Notes
+| Agent | YAML Prompt Key | Returns |
+|---|---|---|
+| `AttractionsAgent` | `attractions-agent` | `List<AttractionOption>` |
+| `OrchestratorAgent` | `orchestrator` | `UnforgettableItinerary` (with 3 `ItineraryVariant` + `ItineraryDay` breakdowns) |
 
 ### Adding a New Agent
 
-1. Create a new class in `src/main/java/com/matoe/agents/` with `@Action` method
-2. Annotate with preconditions and effects (GOAP will auto-wire dependencies)
-3. Return a strongly-typed result (e.g., `List<AccommodationOption>`)
-4. Add the prompt to `application.yml` under `travel-agency.prompts.*`
-5. Wire the agent into `TravelService` for parallel execution
+1. Create `src/main/java/com/matoe/agents/MyAgent.java` as `@Component`
+2. Inject: `BrowserAgentService`, `LlmService`, `ObjectMapper`, `PromptTemplateService`, `DynamicPromptService`, `LlmCostTrackingService`, `SearchTargetService`
+3. Add `@Value("${travel-agency.prompts.my-agent}")` for the prompt
+4. Add `@Value("${travel-agency.browser.my-sites:site1.com,site2.com}")` for sites
+5. Add `@PostConstruct` to register default prompt with `DynamicPromptService`
+6. Implement search method: browser-first → LLM fallback → cost tracking → provenance tagging
+7. Add prompt to `application.yml` under `travel-agency.prompts.my-agent`
+8. Add sites to `application.yml` under `travel-agency.browser.my-sites`
+9. Add `buildMyPrompt()` to `PromptTemplateService`
+10. Wire into `TravelPlannerAgent` (add field, constructor param, `@Action` method or call from existing)
+11. Wire into `TravelService` fallback path if needed
+12. Add agent to `INITIAL_AGENTS` array in `frontend/src/App.js`
 
-Example:
+### Domain Model
+
+```
+TravelRequest           → User input (destination, dates, guests, budget, styles, models, interests, origin)
+AccommodationOption      → Hotel/BB/apartment/hostel result (with source provenance, imageUrl)
+TransportOption          → Flight/car/bus/train/ferry result (with source, origin, destination)
+AttractionOption         → Attraction/experience (category, tags, duration)
+ItineraryDay             → Day-by-day: morning/afternoon/evening activities, meals, transport notes, cost
+ItineraryVariant         → One of 3 tiers: accommodations, transport, attractions, dayByDay, highlights, tradeoffs
+UnforgettableItinerary   → Final output: all above + regionInsights, weatherForecast, currencyInfo, variants
+```
+
+### Database
+
+**SQLite** (local): `src/main/resources/db/migration/V1__init.sql` — uses `INTEGER PRIMARY KEY` (auto-increments in SQLite)
+**PostgreSQL** (Docker): `src/main/resources/db/migration/postgres/V1__init.sql` — uses `SERIAL PRIMARY KEY`
+
+Flyway location configured per profile:
+- Default: `classpath:db/migration` (SQLite)
+- Docker profile: `classpath:db/migration/postgres` (set in `application-docker.yml`)
+
+**Tables:**
+- `itineraries` — completed itineraries with JSON columns for nested data
+- `prompt_versions` — prompt version history (admin rollback support)
+- `llm_cost_log` — every LLM call with tokens, cost, duration, success/failure
+- `search_targets` — per-agent search sites (admin can enable/disable at runtime)
+
+### Services
+
+| Service | Purpose |
+|---|---|
+| `TravelService` | Orchestration: Embabel GOAP primary path, CompletableFuture fallback, budget enforcement, tiering, persistence |
+| `LlmService` | Multi-provider LLM routing by prefix (anthropic/, lmstudio/, ollama/, openrouter/) |
+| `BrowserAgentService` | Java WebClient → Python browser-use service (health check, browse, batch) |
+| `AgentProgressService` | SSE `SseEmitter` management per session |
+| `PromptTemplateService` | `{{variable}}` substitution in prompt templates |
+| `DynamicPromptService` | DB-backed prompts override YAML defaults; version history + rollback |
+| `LlmCostTrackingService` | Per-session budget ceiling enforcement, cost dashboard queries |
+| `SearchTargetService` | DB search targets override YAML site lists per agent |
+
+### Frontend
+
+| Component | Purpose |
+|---|---|
+| `App.js` | Main: planner/admin tabs, SSE connection, 14-agent INITIAL_AGENTS array |
+| `MissionControl.js` | Trip form: destination, origin, dates, guests, budget, style, accommodation/transport types, interest tags, LLM model selection |
+| `LiveAgentTracker.js` | Real-time SSE: status emoji, color, progress bar per agent |
+| `ItineraryCanvas.js` | Results: variant selector, day-by-day timeline, weather/currency cards, attractions, accommodation/transport with tier compare, source badges, synthetic warning (no Book for `source=llm`) |
+| `AdminDashboard.js` | Admin: prompt editor (version history), LLM cost monitoring (by agent/model), search target management (enable/disable/priority) |
+
+### API Endpoints
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/travel/plan?sessionId=x` | POST | None | Plan trip (body: `TravelRequest`) |
+| `/api/travel/progress/{sessionId}` | GET (SSE) | None | Real-time agent progress stream |
+| `/api/travel/itineraries` | GET | None | List saved itineraries |
+| `/api/travel/itineraries/search?destination=x` | GET | None | Search itineraries |
+| `/api/travel/health` | GET | None | Health check |
+| `/api/admin/prompts` | GET | None | List all agent prompts |
+| `/api/admin/prompts/{agentName}` | GET/POST | POST: `X-Admin-Token` | Get/update prompt |
+| `/api/admin/prompts/{agentName}/rollback/{version}` | POST | `X-Admin-Token` | Rollback prompt |
+| `/api/admin/costs?hours=24` | GET | None | Cost dashboard |
+| `/api/admin/costs/session/{sessionId}` | GET | None | Session cost |
+| `/api/admin/search-targets` | GET/POST | POST: `X-Admin-Token` | List/add search targets |
+| `/api/admin/search-targets/{id}` | PUT/DELETE | `X-Admin-Token` | Update/delete target |
+| `/api/admin/status` | GET | None | System status |
+
+### Security
+
+- **Admin mutations** require `X-Admin-Token` header matching `MATOE_ADMIN_TOKEN` env var. If env var is empty, auth is disabled (open access).
+- **CORS** configured via `matoe.cors.allowed-origins` (default: `http://localhost:3000,http://localhost:80`)
+- **Docker:** PostgreSQL and Redis ports are NOT exposed to the host (internal network only)
+- **Synthetic data:** LLM-generated results tagged `source=llm`, Book links hidden in frontend, "AI-generated estimate" warning shown
+
+### Docker / NAS Deployment
+
+- **Spring profiles:** `SPRING_PROFILES_ACTIVE=docker` activates `application-docker.yml` (PostgreSQL dialect, driver, Flyway postgres location)
+- **NAS networking:** `extra_hosts: ["host.docker.internal:host-gateway"]` on backend service for Linux Docker hosts
+- **Memory budget:** Backend 2GB, browser 1GB (1 instance), PostgreSQL ~512MB, Redis ~256MB. Total ~4GB. Fits 16GB NAS.
+- **Browser scaling:** Default 1 instance. Add `browser-2`, `browser-3` in docker-compose.yml and uncomment in `browser_service/nginx.conf` to scale.
+- **Browser process safety:** `main.py` wraps browser agent in `try/finally` with `await browser.close()` to prevent Chromium leaks.
+
+### Configuration (application.yml)
+
+All prompts under `travel-agency.prompts.*` — use `{{variable}}` placeholders:
+- `{{destination}}`, `{{startDate}}`, `{{endDate}}`, `{{guestCount}}`, `{{nights}}`, `{{days}}`
+- `{{budgetMin}}`, `{{budgetMax}}`, `{{travelStyle}}`, `{{originCity}}`, `{{interestTags}}`
+
+All browser sites under `travel-agency.browser.*` — comma-separated, overridable via admin dashboard.
+
+Cost tracking: `travel-agency.cost-tracking.per-session-budget-usd` (default $2.00), `warn-at-percent` (default 80%).
+
+### Environment Variables
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic Claude | (empty) |
+| `OPENROUTER_API_KEY` | OpenRouter | (empty) |
+| `OPENAI_API_KEY` | OpenAI | (empty) |
+| `LMSTUDIO_BASE_URL` | LM Studio endpoint | `http://localhost:1234/v1` |
+| `OLLAMA_BASE_URL` | Ollama endpoint | `http://localhost:11434/v1` |
+| `BROWSER_SERVICE_URL` | browser-use service | `http://localhost:8001` |
+| `BROWSER_SERVICE_ENABLED` | Enable/disable browser | `true` |
+| `MATOE_ADMIN_TOKEN` | Admin API auth token | (empty = no auth) |
+| `MATOE_CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000,http://localhost:80` |
+| `SPRING_PROFILES_ACTIVE` | Spring profile | (empty = SQLite) |
+
+### Key Design Constraints
+
+1. **All agent outputs strongly typed** — JVM records with Jackson annotations. No unstructured text.
+2. **All prompts externalized** — `application.yml` or DB via `DynamicPromptService`. Never hardcoded.
+3. **Zero recompilation for changes** — models, prompts, sites, API keys all configurable at runtime.
+4. **Budget tiering mandatory** — 70% / 130% thresholds in `TravelService`. All results categorized Budget/Standard/Luxury.
+5. **NAS-safe memory** — Backend capped at 2GB JVM, browser at 1GB. Total stack under 5GB.
+6. **Source provenance** — Every result tagged `source=browser` or `source=llm`. Synthetic data clearly labelled.
+7. **Graceful degradation** — Browser unavailable → LLM fallback. LLM fails → empty list (never crash the trip). Budget exceeded → skip synthesis, return raw results.
+
+### Testing
+
+**4 test classes, 54+ test methods:**
+- `DomainModelTest` — Jackson round-trip serialization for all 7 domain records
+- `LlmServiceTest` — Model routing (`resolveAnthropicModel`), JSON extraction, prefix stripping
+- `PromptTemplateServiceTest` — Variable substitution for all agent prompt builders, edge cases
+- `OrchestratorAgentTest` — Fallback variant generation, tier filtering, cost calculation
+
+**Test config:** `src/test/resources/application.yml` — in-memory SQLite, Flyway disabled, `ddl-auto: create-drop`, browser disabled, placeholder API keys.
+
+### Common Patterns
+
+**Agent search method pattern:**
 ```java
-@Component
-public class MyAgent {
-  @Action(
-    name = "my_action",
-    preconditions = {"some_condition"},
-    effects = {"my_effect"}
-  )
-  public List<MyResult> search(TravelRequest request) {
-    // Implementation
-  }
+public List<ResultType> search(TravelRequest request) {
+    // 1. Try browser
+    if (browserService.isAvailable()) {
+        List<Map<String, Object>> raw = browserService.browseForList(task, sites, schema, model);
+        if (raw != null && !raw.isEmpty()) return raw.stream().map(m -> map(m, "browser")).toList();
+    }
+    // 2. LLM fallback
+    String prompt = dynamicPromptService.getPrompt("agent-name");
+    String userPrompt = promptTemplateService.buildXPrompt(prompt, request);
+    long start = System.currentTimeMillis();
+    String raw = llmService.call(model, systemPrompt, userPrompt);
+    costTracker.logCall(sessionId, "agent-name", model, provider, inputTokens, outputTokens, durationMs, true, null);
+    return objectMapper.readValue(llmService.extractJson(raw), new TypeReference<>() {}).stream().map(m -> map(m, "llm")).toList();
+    // 3. Empty fallback on failure
 }
 ```
 
-### Tiering Logic
+**Tiering:** `TravelService.tierAccommodations()` / `tierTransport()` — 70% of midpoint = budget line, 130% = luxury line.
 
-Accommodations and transport are tiered by `TravelService.tierAccommodations()` and `TravelService.tierTransport()` based on the budget range. Adjust the thresholds (currently 70% for budget, 130% for luxury) if needed.
+**SSE:** `AgentProgressService.update(sessionId, agentName, status, progress, message)` — called from `TravelPlannerAgent` action methods.
 
-### Adding a New LLM Provider
+**Dynamic prompts:** DB version (via admin dashboard) overrides YAML default. `DynamicPromptService.getPrompt("agent-name")` checks DB first.
 
-1. Add Embabel starter dependency to `build.gradle.kts`
-2. Create config in `application.yml` with model mappings
-3. Inject the `Ai` client in the agent using `@AiClient` or dynamic routing
-4. Update the TravelController to accept the provider selection from frontend
-
-### Frontend Real-Time Updates (Implemented)
-
-SSE streaming is fully implemented:
-- `AgentProgressService` manages `SseEmitter` connections per session
-- `TravelService.planTrip()` broadcasts agent progress events during execution
-- Frontend subscribes via `EventSource` to `/api/travel/progress/{sessionId}`
-- `LiveAgentTracker.js` displays real-time status for all 14 agents
-
-### Database Persistence (Implemented)
-
-Itineraries are persisted in SQLite (local) or PostgreSQL (Docker):
-- `ItineraryEntity` stores all data including JSON columns for nested collections
-- `PromptVersionEntity` stores prompt version history for admin rollback
-- `LlmCostLogEntity` tracks every LLM call with token counts and cost estimates
-- `SearchTargetEntity` stores configurable search sites per agent
-- Flyway migrations run automatically on startup (`V1__init.sql`)
-
-### Admin Dashboard (Implemented)
-
-Runtime configuration without recompilation:
-- **Prompt Editor** at `/api/admin/prompts/{agentName}` — POST to save new version, version history with rollback
-- **Cost Monitoring** at `/api/admin/costs` — spending by agent, model, and session
-- **Search Targets** at `/api/admin/search-targets` — enable/disable sites per agent
-
-## Common Patterns
-
-### Parallelizing Agents
-
-Use `CompletableFuture.supplyAsync()` in `TravelService.planTrip()` to run accommodation and transport agents in parallel:
-
-```java
-CompletableFuture<List<AccommodationOption>> hotelFuture = 
-  CompletableFuture.supplyAsync(() -> hotelAgent.search(request));
-CompletableFuture<List<TransportOption>> flightFuture = 
-  CompletableFuture.supplyAsync(() -> flightAgent.search(request));
-
-// Wait for both to complete
-CompletableFuture.allOf(hotelFuture, flightFuture).join();
-```
-
-### Dynamic LLM Selection
-
-The `TravelRequest` payload includes `orchestratorModel` and `extractorModel`. Inside an `@Action` method, construct the Ai client dynamically:
-
-```java
-Ai orchestrator = embabel.client(request.orchestratorModel());
-String itinerary = orchestrator.prompt(systemPrompt).ask("Plan a trip to " + request.destination());
-```
-
-### Strongly-Typed Output
-
-All agent responses must be strongly typed. Define records with Jackson annotations:
-
-```java
-public record HotelResult(
-  @JsonProperty("name") String name,
-  @JsonProperty("price_usd") double priceUsd,
-  @JsonProperty("rating") double rating
-) {}
-```
-
-Then parse/validate the response before returning:
-
-```java
-List<HotelResult> hotels = objectMapper.readValue(llmResponse, new TypeReference<List<HotelResult>>() {});
-return hotels; // Type-safe
-```
-
-### Error Handling
-
-Agents should gracefully degrade if a data source is unavailable. Return an empty list rather than crashing the entire itinerary:
-
-```java
-try {
-  return scrapeHotels(url);
-} catch (IOException e) {
-  logger.warn("Hotel scrape failed; returning empty list", e);
-  return Collections.emptyList(); // Don't fail the trip
-}
-```
-
-### Budget Tiering
-
-The `TravelService` includes `tierAccommodations()` and `tierTransport()` methods. These group results by price:
-
-```java
-// Thresholds (adjustable in application.yml or at runtime):
-// Budget: 0–70% of max budget
-// Standard: 70–130% of max budget
-// Luxury: 130%+ of max budget
-```
-
-Adjust thresholds if the default split doesn't match user expectations.
+**Search targets:** `SearchTargetService.getSites("agent-name", yamlDefault)` — DB targets override YAML when admin configures them.

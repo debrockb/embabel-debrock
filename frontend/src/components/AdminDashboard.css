@@ -4,7 +4,34 @@
 
 .admin-dashboard h2 {
   color: #333;
+  margin-bottom: 1rem;
+}
+
+.admin-token-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: #fff3e0;
+  border-radius: 6px;
+  border: 1px solid #ffe0b2;
+}
+
+.admin-token-bar label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #e65100;
+  white-space: nowrap;
+}
+
+.admin-token-bar input {
+  flex: 1;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: monospace;
 }
 
 .admin-tabs {

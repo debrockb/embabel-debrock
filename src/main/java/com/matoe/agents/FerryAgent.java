@@ -9,6 +9,7 @@ import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
 import com.matoe.service.LlmService;
 import com.matoe.service.PromptTemplateService;
+import com.matoe.service.SearchTargetService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class FerryAgent {
     private final PromptTemplateService promptTemplateService;
     private final DynamicPromptService dynamicPromptService;
     private final LlmCostTrackingService costTracker;
+    private final SearchTargetService searchTargetService;
 
     @Value("${travel-agency.prompts.ferry-agent}")
     private String defaultPrompt;
@@ -43,13 +45,15 @@ public class FerryAgent {
 
     public FerryAgent(BrowserAgentService browserService, LlmService llmService,
                       ObjectMapper objectMapper, PromptTemplateService promptTemplateService,
-                      DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker) {
+                      DynamicPromptService dynamicPromptService, LlmCostTrackingService costTracker,
+                      SearchTargetService searchTargetService) {
         this.browserService = browserService;
         this.llmService = llmService;
         this.objectMapper = objectMapper;
         this.promptTemplateService = promptTemplateService;
         this.dynamicPromptService = dynamicPromptService;
         this.costTracker = costTracker;
+        this.searchTargetService = searchTargetService;
         // Register YAML default (DB version will override if set by admin)
         dynamicPromptService.registerDefault("ferry-agent", "");
     }
@@ -69,7 +73,7 @@ public class FerryAgent {
             try {
                 List<Map<String, Object>> raw = browserService.browseForList(
                     buildBrowserTask(request, days),
-                    Arrays.asList(ferrySites.split(",")),
+                    searchTargetService.getSites("ferry-agent", ferrySites),
                     "a JSON array of ferry route objects each with: operator (string), " +
                     "departureTime (HH:mm), arrivalTime (HH:mm), duration (string), " +
                     "price (per person, number), bookingUrl (string), cabinType (string), " +

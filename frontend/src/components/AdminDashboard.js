@@ -9,6 +9,19 @@ function AdminDashboard() {
   const [editingPrompt, setEditingPrompt] = useState(null);
   const [editText, setEditText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [adminToken, setAdminToken] = useState(localStorage.getItem('matoe-admin-token') || '');
+
+  const authHeaders = (extra = {}) => ({
+    'Content-Type': 'application/json',
+    ...(adminToken ? { 'X-Admin-Token': adminToken } : {}),
+    ...extra,
+  });
+
+  const handleTokenChange = (e) => {
+    const val = e.target.value;
+    setAdminToken(val);
+    localStorage.setItem('matoe-admin-token', val);
+  };
 
   const fetchPrompts = useCallback(async () => {
     try {
@@ -43,7 +56,7 @@ function AdminDashboard() {
     try {
       await fetch(`/api/admin/prompts/${agentName}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ promptText: editText, author: 'admin' }),
       });
       setEditingPrompt(null);
@@ -57,7 +70,7 @@ function AdminDashboard() {
     try {
       await fetch(`/api/admin/search-targets/${target.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ ...target, enabled: !target.enabled }),
       });
       fetchTargets();
@@ -67,6 +80,16 @@ function AdminDashboard() {
   return (
     <div className="admin-dashboard">
       <h2>Admin Dashboard</h2>
+
+      <div className="admin-token-bar">
+        <label>Admin Token:</label>
+        <input
+          type="password"
+          value={adminToken}
+          onChange={handleTokenChange}
+          placeholder="Enter MATOE_ADMIN_TOKEN (leave blank if not configured)"
+        />
+      </div>
 
       <div className="admin-tabs">
         <button className={activeTab === 'prompts' ? 'active' : ''} onClick={() => setActiveTab('prompts')}>
