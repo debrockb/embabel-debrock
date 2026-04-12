@@ -52,8 +52,11 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.xerial:sqlite-jdbc")
     runtimeOnly("org.hibernate.orm:hibernate-community-dialects")
+    // Spring Boot 3.2.4 ships flyway-core 9.22.3 (Flyway 9.x), which bundles
+    // built-in Postgres support directly in flyway-core. The separate
+    // flyway-database-postgresql module only exists in Flyway 10+ (Spring
+    // Boot 3.3+), so we do NOT declare it here — that was the CI failure.
     implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
 
     // HTTP Client (WebFlux/WebClient for browser-service + LLM calls)
     implementation("org.springframework.boot:spring-boot-starter-webflux")
