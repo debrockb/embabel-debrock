@@ -10,7 +10,8 @@ java.sourceCompatibility = JavaVersion.VERSION_21
 
 repositories {
     mavenCentral()
-    // Embabel Agent Framework repositories
+    // Embabel Agent Framework repositories — kept for the day we re-introduce
+    // the starter. Not currently resolving any deps (see below).
     maven {
         name = "EmbabelReleases"
         url = uri("https://repo.embabel.com/artifactory/libs-release")
@@ -28,20 +29,32 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    // ─── Embabel Agent Framework 0.3.5 ────────────────────────────────────────
-    // Core agent platform (GOAP planner, @Agent, @Action, AgentPlatform, Ai)
-    implementation("com.embabel.agent:embabel-agent-starter:0.3.5")
-    // LLM provider starters
-    implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-ollama:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5")
-    // OpenAI-compatible custom endpoints (OpenRouter, Groq, etc.)
-    implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
-    // WebMVC endpoints (agent REST API)
-    implementation("com.embabel.agent:embabel-agent-starter-webmvc:0.3.5")
-    // Observability (OpenTelemetry tracing, metrics)
-    implementation("com.embabel.agent:embabel-agent-starter-observability:0.3.5")
+    // ─── Embabel Agent Framework 0.3.5 — TEMPORARILY DISABLED ────────────────
+    //
+    // Embabel 0.3.5's `embabel-agent-api.jar` ships
+    // `com.embabel.agent.api.event.AgenticEvent.class` with bytecode that
+    // Spring Boot 3.2.4's ASM reader (Spring Framework 6.1.5) cannot parse
+    // during component scanning. The failure surfaces as
+    //   BeanDefinitionStoreException: Failed to read candidate component
+    //   class ... Caused by: java.lang.IllegalArgumentException at Enum.java
+    // and blocks the Spring ApplicationContext from loading — i.e. both
+    // ./gradlew bootRun and the @SpringBootTest contextLoads test fail.
+    //
+    // Our TravelService already talks to AgentPlatform reflectively with a
+    // full virtual-thread fallback, so removing the starter is a no-op at
+    // runtime: the fallback path is the actual working execution strategy
+    // and mirrors the GOAP plan exactly. Re-introduce these when either (a)
+    // Embabel ships a build compatible with Spring 6.1.x ASM, or (b) the
+    // project upgrades to Spring Boot 3.3+.
+    //
+    // implementation("com.embabel.agent:embabel-agent-starter:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-ollama:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-webmvc:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-observability:0.3.5")
 
     // JSON & Serialization
     implementation("com.fasterxml.jackson.core:jackson-databind")
@@ -76,7 +89,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-core")
-    testImplementation("com.embabel.agent:embabel-agent-test:0.3.5")
+    // testImplementation("com.embabel.agent:embabel-agent-test:0.3.5")  // see above
 }
 
 tasks.withType<Test> {

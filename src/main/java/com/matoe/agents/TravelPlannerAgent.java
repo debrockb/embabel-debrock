@@ -1,9 +1,8 @@
 package com.matoe.agents;
 
-import com.embabel.agent.api.annotation.Action;
-import com.embabel.agent.api.annotation.AchievesGoal;
-import com.embabel.agent.api.annotation.Agent;
-import com.embabel.agent.api.common.OperationContext;
+import com.matoe.annotations.Action;
+import com.matoe.annotations.AchievesGoal;
+import com.matoe.annotations.Agent;
 import com.matoe.domain.*;
 import com.matoe.service.AgentProgressService;
 import org.slf4j.Logger;
