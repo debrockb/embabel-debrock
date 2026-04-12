@@ -5,7 +5,11 @@ import com.matoe.entity.SearchTargetEntity;
 import com.matoe.repository.SearchTargetRepository;
 import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,10 +19,16 @@ import java.util.*;
  * Admin dashboard REST API — prompt management, LLM cost monitoring,
  * search target configuration, and system status.
  */
+/**
+ * CORS is handled globally by {@link com.matoe.config.CorsConfig}. We do NOT
+ * use {@code @CrossOrigin(origins = "*")} here because admin endpoints must
+ * stay locked to the configured {@code matoe.cors.allowed-origins} whitelist.
+ */
 @RestController
 @RequestMapping("/admin")
-@CrossOrigin(origins = "*")
 public class AdminController {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     @Value("${matoe.admin.token:}")
     private String adminToken;
@@ -26,15 +36,43 @@ public class AdminController {
     private final DynamicPromptService promptService;
     private final LlmCostTrackingService costService;
     private final SearchTargetRepository searchTargetRepo;
+    private final Environment env;
 
     public AdminController(DynamicPromptService promptService,
                            LlmCostTrackingService costService,
-                           SearchTargetRepository searchTargetRepo) {
+                           SearchTargetRepository searchTargetRepo,
+                           Environment env) {
         this.promptService = promptService;
         this.costService = costService;
         this.searchTargetRepo = searchTargetRepo;
+        this.env = env;
     }
 
+    @PostConstruct
+    void validateAuthPosture() {
+        boolean isProduction = Arrays.asList(env.getActiveProfiles()).contains("docker")
+                            || Arrays.asList(env.getActiveProfiles()).contains("prod");
+        boolean tokenUnset = adminToken == null || adminToken.isBlank();
+        if (isProduction && tokenUnset) {
+            // Fail closed: refuse to start if deployed without an admin token
+            throw new IllegalStateException(
+                "MATOE_ADMIN_TOKEN is required in production (profile=docker/prod). " +
+                "Set the env var before starting the stack. Admin mutation endpoints " +
+                "will NOT start without a token to avoid accidental open-access deployments."
+            );
+        }
+        if (tokenUnset) {
+            log.warn("MATOE_ADMIN_TOKEN is unset — admin mutation endpoints are OPEN. " +
+                     "This is only acceptable for local dev. Set MATOE_ADMIN_TOKEN for any shared deployment.");
+        }
+    }
+
+    /**
+     * Require a matching X-Admin-Token for mutations. Fails closed when the
+     * token is unset AND the active profile is production — see
+     * {@link #validateAuthPosture()}. In local dev, an unset token still
+     * allows access to keep the DX friction low.
+     */
     private void requireAuth(String token) {
         if (adminToken != null && !adminToken.isBlank()) {
             if (token == null || !token.equals(adminToken)) {

@@ -32,11 +32,17 @@ cd frontend && npm install && npm run dev   # Dev server on :3000
 cd frontend && npm test                     # Tests
 cd frontend && npm run build                # Production build
 
-# Docker
+# Docker — local dev (builds from source)
 docker compose up -d                 # Full stack
 docker compose up -d --build         # Rebuild
 docker compose logs -f backend       # Logs
 docker compose down -v               # Teardown + delete volumes
+
+# Docker — NAS/Portainer (prebuilt GHCR images, requires MATOE_ADMIN_TOKEN)
+MATOE_ADMIN_TOKEN=xxxxx docker compose -f docker-compose.portainer.yml up -d
+
+# PDF export of a saved itinerary
+curl -L -o itinerary.pdf http://localhost:8080/api/travel/itineraries/{id}/pdf
 
 # Health check
 curl http://localhost:8080/api/travel/health

@@ -18,6 +18,24 @@ function ItineraryCanvas({ itinerary }) {
     URL.revokeObjectURL(url);
   };
 
+  // PDF export — calls the backend endpoint so that rendering (layout, fonts,
+  // synthetic warnings) stays consistent across clients. The backend serves
+  // application/pdf with Content-Disposition: attachment, so we just navigate
+  // the browser to the URL and let it download.
+  const handleDownloadPdf = () => {
+    if (!itinerary.id) {
+      alert('PDF download requires a saved itinerary (with an id).');
+      return;
+    }
+    const url = `/api/travel/itineraries/${encodeURIComponent(itinerary.id)}/pdf`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   if (!itinerary) return <div className="itinerary-canvas">No itinerary data</div>;
 
   const formatDate = (dateString) => {
@@ -261,6 +279,7 @@ function ItineraryCanvas({ itinerary }) {
       {/* Actions */}
       <div className="itinerary-actions">
         <button className="action-btn download-btn" onClick={handleDownload}>Download JSON</button>
+        <button className="action-btn download-btn" onClick={handleDownloadPdf}>Download PDF</button>
       </div>
     </div>
   );

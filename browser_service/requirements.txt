@@ -1,7 +1,13 @@
-browser-use>=0.1.40
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pydantic>=2.7.0
-langchain-anthropic>=0.3.0
-langchain-openai>=0.2.0
-python-dotenv>=1.0.0
+# M.A.T.O.E Browser Service — pinned for reproducible NAS/Portainer builds.
+#
+# Browser automation libraries break often across minor versions. These pins
+# were chosen in April 2026 against a working browser-use integration. To
+# upgrade, bump a single pin, rebuild the browser image, and re-test the
+# /browse endpoint before promoting to production.
+browser-use==0.1.48
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+langchain-anthropic==0.3.3
+langchain-openai==0.2.14
+python-dotenv==1.0.1

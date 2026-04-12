@@ -48,3 +48,16 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Claude Code (local user settings / permissions)
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# PDF export workdir
+/tmp_exports/

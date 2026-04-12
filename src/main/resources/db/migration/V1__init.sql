@@ -65,3 +65,41 @@ CREATE TABLE IF NOT EXISTS search_targets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_targets_agent ON search_targets(agent_name, enabled);
+
+-- Seed default search targets so a fresh install shows sensible defaults in the
+-- admin dashboard. These mirror the `travel-agency.browser.*` YAML defaults;
+-- admins can enable/disable or reorder at runtime via the admin API.
+INSERT INTO search_targets (agent_name, site_url, enabled, priority, rate_limit_rpm, notes) VALUES
+  ('hotel-agent',       'booking.com',        1, 1, 10, 'Primary hotel inventory'),
+  ('hotel-agent',       'hotels.com',         1, 2, 10, NULL),
+  ('hotel-agent',       'expedia.com',        1, 3, 10, NULL),
+  ('bb-agent',          'booking.com',        1, 1, 10, NULL),
+  ('bb-agent',          'airbnb.com',         1, 2, 10, NULL),
+  ('bb-agent',          'bedandbreakfast.com',1, 3, 10, NULL),
+  ('apartment-agent',   'airbnb.com',         1, 1, 10, NULL),
+  ('apartment-agent',   'vrbo.com',           1, 2, 10, NULL),
+  ('apartment-agent',   'booking.com',        1, 3, 10, NULL),
+  ('hostel-agent',      'hostelworld.com',    1, 1, 10, NULL),
+  ('hostel-agent',      'booking.com',        1, 2, 10, NULL),
+  ('flight-agent',      'skyscanner.com',     1, 1, 10, NULL),
+  ('flight-agent',      'google.com/flights', 1, 2, 10, NULL),
+  ('flight-agent',      'kayak.com',          1, 3, 10, NULL),
+  ('car-agent',         'rentalcars.com',     1, 1, 10, NULL),
+  ('car-agent',         'flixbus.com',        1, 2, 10, NULL),
+  ('train-agent',       'thetrainline.com',   1, 1, 10, NULL),
+  ('train-agent',       'omio.com',           1, 2, 10, NULL),
+  ('train-agent',       'seat61.com',         1, 3, 10, NULL),
+  ('ferry-agent',       'directferries.com',  1, 1, 10, NULL),
+  ('ferry-agent',       'aferry.com',         1, 2, 10, NULL),
+  ('country-specialist','lonelyplanet.com',   1, 1, 10, NULL),
+  ('country-specialist','wikivoyage.org',     1, 2, 10, NULL),
+  ('country-specialist','tripadvisor.com',    1, 3, 10, NULL),
+  ('attractions-agent', 'viator.com',         1, 1, 10, NULL),
+  ('attractions-agent', 'getyourguide.com',   1, 2, 10, NULL),
+  ('attractions-agent', 'tripadvisor.com',    1, 3, 10, NULL),
+  ('weather-agent',     'weather.com',        1, 1, 10, NULL),
+  ('weather-agent',     'accuweather.com',    1, 2, 10, NULL),
+  ('currency-agent',    'xe.com',             1, 1, 10, NULL),
+  ('currency-agent',    'oanda.com',          1, 2, 10, NULL),
+  ('review-summary-agent','tripadvisor.com',  1, 1, 10, NULL),
+  ('review-summary-agent','reddit.com/r/travel',1,2,10, NULL);

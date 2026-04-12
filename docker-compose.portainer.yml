@@ -1,13 +1,17 @@
 ## ═══════════════════════════════════════════════════════════════════════════════
-## M.A.T.O.E — NAS / Portainer Deployment
+## M.A.T.O.E — NAS / Portainer Deployment (prebuilt-image stack)
 ## ═══════════════════════════════════════════════════════════════════════════════
-## Deploy via Portainer → Stacks → Add Stack → Repository
-##   Repository URL : https://github.com/debrockb/embabel-debrock
-##   Compose path   : docker-compose.portainer.yml
-##   Branch         : main
+## Deploy via Portainer → Stacks → Add Stack → Web editor (paste this file).
+## No source checkout required — images pulled from GHCR.
 ##
-## Required environment variables (set in Portainer Stack settings):
-##   MATOE_ADMIN_TOKEN   — required for admin API write access
+## Images used (multi-arch, built by .github/workflows/publish-images.yml):
+##   ghcr.io/debrockb/embabel-debrock-backend:${MATOE_IMAGE_TAG:-latest}
+##   ghcr.io/debrockb/embabel-debrock-frontend:${MATOE_IMAGE_TAG:-latest}
+##   ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+##
+## REQUIRED environment variables (set in Portainer Stack settings):
+##   MATOE_ADMIN_TOKEN   — admin API auth (REQUIRED in production; the backend
+##                         will refuse to start if unset while profile=docker)
 ##
 ## Optional (for cloud LLMs):
 ##   ANTHROPIC_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY
@@ -15,17 +19,29 @@
 ## For local LLMs on the NAS LAN:
 ##   LMSTUDIO_BASE_URL=http://192.168.1.100:1234/v1
 ##   OLLAMA_BASE_URL=http://192.168.1.100:11434
+##
+## Security notes:
+##   • Backend port (8080) is NOT published to the host. All traffic goes
+##     through the frontend (port 3080) which reverse-proxies /api → backend.
+##   • PostgreSQL and Redis stay on the internal matoe-network.
+##   • MATOE_CORS_ORIGINS defaults to the internal frontend origin only.
 ## ═══════════════════════════════════════════════════════════════════════════════
 
 services:
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/debrockb/embabel-debrock-backend:${MATOE_IMAGE_TAG:-latest}
+    # Fallback to source build if images are not published yet:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: MATOE-Backend
-    ports:
-      - "8085:8080"
+    # Backend is intentionally NOT exposed to the host — frontend proxies /api.
+    # Uncomment only if you need direct access for debugging:
+    # ports:
+    #   - "8085:8080"
+    expose:
+      - "8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -33,7 +49,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://matoe-postgres:5432/matoe
       SPRING_DATASOURCE_USERNAME: matoe_user
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-matoe_password}
-      JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx2G -Xms1G"
+      JAVA_TOOL_OPTIONS: "-XX:+UseZGC -XX:ZCollectionInterval=120 -Xmx2G -Xms1G --enable-preview"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -41,8 +57,10 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       BROWSER_SERVICE_URL: http://matoe-browser-lb:80
       BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-true}
-      MATOE_ADMIN_TOKEN: ${MATOE_ADMIN_TOKEN:-}
-      MATOE_CORS_ORIGINS: ${MATOE_CORS_ORIGINS:-http://localhost:3080,http://localhost:80}
+      # Admin token is required in production — backend will refuse to start if unset.
+      MATOE_ADMIN_TOKEN: ${MATOE_ADMIN_TOKEN:?MATOE_ADMIN_TOKEN must be set in Portainer Stack env}
+      # Default CORS locked to the internal frontend origin only.
+      MATOE_CORS_ORIGINS: ${MATOE_CORS_ORIGINS:-http://localhost:3080}
     depends_on:
       matoe-postgres:
         condition: service_healthy
@@ -61,12 +79,14 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/debrockb/embabel-debrock-frontend:${MATOE_IMAGE_TAG:-latest}
+    # Fallback to source build:
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile
     container_name: MATOE-Frontend
     ports:
-      - "3080:80"
+      - "${MATOE_FRONTEND_PORT:-3080}:80"
     depends_on:
       - backend
     networks:
@@ -74,9 +94,10 @@ services:
     restart: unless-stopped
 
   browser-1:
-    build:
-      context: ./browser_service
-      dockerfile: Dockerfile
+    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+    # build:
+    #   context: ./browser_service
+    #   dockerfile: Dockerfile
     container_name: MATOE-Browser-1
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -84,6 +105,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
@@ -98,9 +121,7 @@ services:
     restart: unless-stopped
 
   browser-2:
-    build:
-      context: ./browser_service
-      dockerfile: Dockerfile
+    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
     container_name: MATOE-Browser-2
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -108,6 +129,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
@@ -122,9 +145,7 @@ services:
     restart: unless-stopped
 
   browser-3:
-    build:
-      context: ./browser_service
-      dockerfile: Dockerfile
+    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
     container_name: MATOE-Browser-3
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -132,6 +153,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
@@ -146,10 +169,16 @@ services:
     restart: unless-stopped
 
   matoe-browser-lb:
+    # nginx LB across browser-1/2/3. Config is baked into the browser image
+    # build at /etc/nginx/nginx.conf — we mount it from a config volume populated
+    # via a config file shipped in the backend image, or use the default image
+    # config if you prefer. For simplicity, we use nginx:alpine with a
+    # ConfigMap-style approach: the config is embedded inline below.
     image: nginx:alpine
     container_name: MATOE-Browser-LB
-    volumes:
-      - ./browser_service/nginx.conf:/etc/nginx/nginx.conf:ro
+    configs:
+      - source: browser_nginx_conf
+        target: /etc/nginx/nginx.conf
     depends_on:
       - browser-1
       - browser-2
@@ -185,6 +214,33 @@ services:
       - matoe_redis_data:/data
     command: redis-server --appendonly yes
     restart: unless-stopped
+
+configs:
+  browser_nginx_conf:
+    # Inline nginx config for the browser load-balancer. Works without a repo
+    # checkout — Portainer ships this inline to /etc/nginx/nginx.conf in the LB.
+    content: |
+      events { worker_connections 1024; }
+      http {
+        upstream browser_pool {
+          least_conn;
+          server browser-1:8001;
+          server browser-2:8001;
+          server browser-3:8001;
+        }
+        server {
+          listen 80;
+          location / {
+            proxy_pass http://browser_pool;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host $$host;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+            proxy_connect_timeout 10s;
+          }
+        }
+      }
 
 networks:
   matoe-network:

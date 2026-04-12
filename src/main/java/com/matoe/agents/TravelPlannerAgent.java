@@ -8,9 +8,11 @@ import com.matoe.domain.*;
 import com.matoe.service.AgentProgressService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Embabel GOAP Agent — the top-level agent registered with AgentPlatform.
@@ -50,6 +52,7 @@ public class TravelPlannerAgent {
     private final ReviewSummaryAgent reviewSummaryAgent;
     private final OrchestratorAgent orchestratorAgent;
     private final AgentProgressService progressService;
+    private final ExecutorService agentExecutor;
 
     public TravelPlannerAgent(
             HotelAgent hotelAgent, BBAgent bbAgent,
@@ -61,7 +64,8 @@ public class TravelPlannerAgent {
             WeatherAgent weatherAgent, CurrencyAgent currencyAgent,
             ReviewSummaryAgent reviewSummaryAgent,
             OrchestratorAgent orchestratorAgent,
-            AgentProgressService progressService) {
+            AgentProgressService progressService,
+            @Qualifier("agentExecutor") ExecutorService agentExecutor) {
         this.hotelAgent = hotelAgent;
         this.bbAgent = bbAgent;
         this.apartmentAgent = apartmentAgent;
@@ -77,6 +81,7 @@ public class TravelPlannerAgent {
         this.reviewSummaryAgent = reviewSummaryAgent;
         this.orchestratorAgent = orchestratorAgent;
         this.progressService = progressService;
+        this.agentExecutor = agentExecutor;
     }
 
     // ── GOAP wrapper types (on the blackboard) ───────────────────────────────
@@ -115,25 +120,25 @@ public class TravelPlannerAgent {
                 request.destination(), request.orchestratorModel());
             emit(sid, "Country Specialist", "completed", 100, "Insights ready");
             return r;
-        });
+        }, agentExecutor);
         CompletableFuture<Map<String, Object>> weatherFuture = CompletableFuture.supplyAsync(() -> {
             emit(sid, "Weather Agent", "searching", 15, "Checking weather...");
             Map<String, Object> r = weatherAgent.getWeatherForecast(request);
             emit(sid, "Weather Agent", "completed", 100, "Weather ready");
             return r;
-        });
+        }, agentExecutor);
         CompletableFuture<Map<String, Object>> currencyFuture = CompletableFuture.supplyAsync(() -> {
             emit(sid, "Currency Agent", "searching", 15, "Checking currency...");
             Map<String, Object> r = currencyAgent.getCurrencyInfo(request);
             emit(sid, "Currency Agent", "completed", 100, "Currency ready");
             return r;
-        });
+        }, agentExecutor);
         CompletableFuture<Map<String, Object>> reviewFuture = CompletableFuture.supplyAsync(() -> {
             emit(sid, "Review Agent", "searching", 15, "Aggregating reviews...");
             Map<String, Object> r = reviewSummaryAgent.getReviewSummary(request);
             emit(sid, "Review Agent", "completed", 100, "Reviews ready");
             return r;
-        });
+        }, agentExecutor);
 
         CompletableFuture.allOf(insightsFuture, weatherFuture, currencyFuture, reviewFuture).join();
 
@@ -159,7 +164,7 @@ public class TravelPlannerAgent {
                 List<AccommodationOption> r = hotelAgent.searchHotels(request);
                 emit(sid, "Hotel Agent", "completed", 100, r.size() + " hotels found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.accommodationTypes().contains("bb")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -167,7 +172,7 @@ public class TravelPlannerAgent {
                 List<AccommodationOption> r = bbAgent.searchBBs(request);
                 emit(sid, "B&B Agent", "completed", 100, r.size() + " B&Bs found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.accommodationTypes().contains("apartment")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -175,7 +180,7 @@ public class TravelPlannerAgent {
                 List<AccommodationOption> r = apartmentAgent.searchApartments(request);
                 emit(sid, "Apartment Agent", "completed", 100, r.size() + " apartments found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.accommodationTypes().contains("hostel")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -183,12 +188,46 @@ public class TravelPlannerAgent {
                 List<AccommodationOption> r = hostelAgent.searchHostels(request);
                 emit(sid, "Hostel Agent", "completed", 100, r.size() + " hostels found");
                 return r;
-            }));
+            }, agentExecutor));
         }
 
         List<AccommodationOption> all = new ArrayList<>();
         futures.forEach(f -> all.addAll(f.join()));
-        return new AccommodationResults(all);
+        // FR-023 / FR-024: deduplicate by (name + location) keeping the cheapest price-per-night
+        List<AccommodationOption> deduped = dedupeAccommodations(all);
+        log.info("Accommodations: {} raw → {} after dedupe/best-price", all.size(), deduped.size());
+        return new AccommodationResults(deduped);
+    }
+
+    /**
+     * Deduplicate accommodations by normalised (name + location) key, retaining
+     * the lowest {@code pricePerNight} when duplicates are found. Prefers
+     * results with {@code source=browser} over {@code source=llm} when prices
+     * tie. Exposed as package-private for testing.
+     */
+    static List<AccommodationOption> dedupeAccommodations(List<AccommodationOption> list) {
+        if (list == null || list.isEmpty()) return List.of();
+        Map<String, AccommodationOption> best = new LinkedHashMap<>();
+        for (AccommodationOption a : list) {
+            if (a == null || a.name() == null) continue;
+            String key = (a.name().trim().toLowerCase(Locale.ROOT)
+                + "|" + (a.location() == null ? "" : a.location().trim().toLowerCase(Locale.ROOT)));
+            AccommodationOption prior = best.get(key);
+            if (prior == null || isBetter(a, prior)) {
+                best.put(key, a);
+            }
+        }
+        return new ArrayList<>(best.values());
+    }
+
+    /** Better = strictly cheaper, OR same price but with real-source provenance. */
+    private static boolean isBetter(AccommodationOption candidate, AccommodationOption incumbent) {
+        if (candidate.pricePerNight() < incumbent.pricePerNight()) return true;
+        if (candidate.pricePerNight() == incumbent.pricePerNight()) {
+            return "browser".equalsIgnoreCase(candidate.source())
+                && !"browser".equalsIgnoreCase(incumbent.source());
+        }
+        return false;
     }
 
     /**
@@ -205,7 +244,7 @@ public class TravelPlannerAgent {
                 List<TransportOption> r = flightAgent.searchFlights(request);
                 emit(sid, "Flight Agent", "completed", 100, r.size() + " flights found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.transportTypes().contains("car") || request.transportTypes().contains("bus")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -213,7 +252,7 @@ public class TravelPlannerAgent {
                 List<TransportOption> r = carBusAgent.searchGroundTransport(request);
                 emit(sid, "Car/Bus Agent", "completed", 100, r.size() + " options found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.transportTypes().contains("train")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -221,7 +260,7 @@ public class TravelPlannerAgent {
                 List<TransportOption> r = trainAgent.searchTrains(request);
                 emit(sid, "Train Agent", "completed", 100, r.size() + " train routes found");
                 return r;
-            }));
+            }, agentExecutor));
         }
         if (request.transportTypes().contains("ferry")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
@@ -229,12 +268,45 @@ public class TravelPlannerAgent {
                 List<TransportOption> r = ferryAgent.searchFerries(request);
                 emit(sid, "Ferry Agent", "completed", 100, r.size() + " ferry routes found");
                 return r;
-            }));
+            }, agentExecutor));
         }
 
         List<TransportOption> all = new ArrayList<>();
         futures.forEach(f -> all.addAll(f.join()));
-        return new TransportResults(all);
+        List<TransportOption> deduped = dedupeTransport(all);
+        log.info("Transport: {} raw → {} after dedupe/best-price", all.size(), deduped.size());
+        return new TransportResults(deduped);
+    }
+
+    /**
+     * Deduplicate transport by (type + provider + origin + destination), keeping
+     * the cheapest {@code price}. Prefers {@code source=browser} on price ties.
+     */
+    static List<TransportOption> dedupeTransport(List<TransportOption> list) {
+        if (list == null || list.isEmpty()) return List.of();
+        Map<String, TransportOption> best = new LinkedHashMap<>();
+        for (TransportOption t : list) {
+            if (t == null) continue;
+            String key = String.join("|",
+                String.valueOf(t.type()).toLowerCase(Locale.ROOT),
+                String.valueOf(t.provider()).toLowerCase(Locale.ROOT),
+                String.valueOf(t.origin()).toLowerCase(Locale.ROOT),
+                String.valueOf(t.destination()).toLowerCase(Locale.ROOT));
+            TransportOption prior = best.get(key);
+            if (prior == null || isBetterTransport(t, prior)) {
+                best.put(key, t);
+            }
+        }
+        return new ArrayList<>(best.values());
+    }
+
+    private static boolean isBetterTransport(TransportOption candidate, TransportOption incumbent) {
+        if (candidate.price() < incumbent.price()) return true;
+        if (candidate.price() == incumbent.price()) {
+            return "browser".equalsIgnoreCase(candidate.source())
+                && !"browser".equalsIgnoreCase(incumbent.source());
+        }
+        return false;
     }
 
     /**

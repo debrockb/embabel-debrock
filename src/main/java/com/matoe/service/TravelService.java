@@ -1,32 +1,47 @@
 package com.matoe.service;
 
+import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.core.AgentProcess;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.matoe.agents.*;
+import com.matoe.agents.TravelPlannerAgent;
 import com.matoe.agents.TravelPlannerAgent.*;
 import com.matoe.domain.*;
 import com.matoe.entity.ItineraryEntity;
 import com.matoe.repository.ItineraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 /**
  * Core orchestration service.
  *
- * Dispatches all specialist agents via TravelPlannerAgent (which carries
- * real Embabel @Agent/@Action/@AchievesGoal annotations for GOAP planning).
- * When AgentPlatform is available at runtime, Embabel's GOAP planner chains
- * the actions automatically. Otherwise, this service drives them directly
- * via CompletableFuture parallelism on Virtual Threads.
+ * <p><b>Execution strategy</b> (in order of preference):
+ * <ol>
+ *   <li><b>Embabel AgentPlatform</b> — if an {@link AgentPlatform} bean is
+ *       available at runtime, execute the trip through Embabel's GOAP planner.
+ *       {@link TravelPlannerAgent} carries {@code @Agent} / {@code @Action} /
+ *       {@code @AchievesGoal} annotations; the platform chains them by type
+ *       and runs independent actions concurrently when
+ *       {@code embabel.agent.platform.process-type=CONCURRENT}.</li>
+ *   <li><b>Virtual-thread fan-out</b> — if Embabel is not on the classpath or
+ *       no platform bean is provided (e.g. tests, stripped deployments), fall
+ *       back to a deterministic CompletableFuture dispatch on the
+ *       {@code agentExecutor} virtual-thread pool. This mirrors the GOAP plan
+ *       exactly: four parallel search/intel actions, then a synthesis step.</li>
+ * </ol>
  *
- * Session ID handling: the controller passes sessionId as a query param.
- * This service creates a sessionId-enriched copy of TravelRequest so that
- * all downstream agents, cost tracking, and SSE progress use the same ID.
+ * <p><b>Session ID propagation</b>: the controller receives sessionId as a
+ * query param (separate from the JSON body). {@link #withSessionId} creates a
+ * copy of TravelRequest with the sessionId injected so ALL downstream agents,
+ * cost tracking, and SSE progress emit to the correct session.
  */
 @Service
 public class TravelService {
@@ -38,38 +53,48 @@ public class TravelService {
     private final LlmCostTrackingService costTracker;
     private final ItineraryRepository repository;
     private final ObjectMapper objectMapper;
+    private final ExecutorService agentExecutor;
+    private final AgentPlatform agentPlatform; // may be null
 
     public TravelService(
             TravelPlannerAgent travelPlannerAgent,
             AgentProgressService progressService,
             LlmCostTrackingService costTracker,
             ItineraryRepository repository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Qualifier("agentExecutor") ExecutorService agentExecutor,
+            @Autowired(required = false) AgentPlatform agentPlatform) {
         this.travelPlannerAgent = travelPlannerAgent;
         this.progressService = progressService;
         this.costTracker = costTracker;
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.agentExecutor = agentExecutor;
+        this.agentPlatform = agentPlatform;
+        log.info("TravelService initialised — AgentPlatform={}, executor=virtual-threads",
+            agentPlatform != null ? "PRESENT (GOAP active)" : "absent (fallback mode)");
     }
 
     // ── public API ────────────────────────────────────────────────────────────
 
     public UnforgettableItinerary planTrip(TravelRequest request, String sessionId) {
-        // Enrich request with sessionId so ALL downstream agents, cost tracking,
-        // and SSE progress emit to the correct session
         TravelRequest enriched = withSessionId(request, sessionId);
         boolean live = sessionId != null && !sessionId.isBlank();
 
         emit(live, sessionId, "Orchestrator", "deployed", 5, "Initialising agent swarm...");
 
-        // Check budget ceiling before starting
+        // Pre-flight budget check
         if (sessionId != null && costTracker.isBudgetExceeded(sessionId)) {
             log.warn("Session {} budget already exceeded — aborting", sessionId);
             throw new RuntimeException("LLM budget ceiling exceeded for this session");
         }
 
-        // Execute via TravelPlannerAgent (GOAP-annotated actions, parallel dispatch)
-        UnforgettableItinerary itinerary = executeAgentPlan(enriched, sessionId);
+        UnforgettableItinerary itinerary;
+        if (agentPlatform != null) {
+            itinerary = runViaEmbabelGoap(enriched, sessionId);
+        } else {
+            itinerary = runViaVirtualThreads(enriched, sessionId);
+        }
 
         // Apply tiering to raw results
         itinerary = applyTiering(itinerary, enriched);
@@ -83,33 +108,59 @@ public class TravelService {
         return itinerary;
     }
 
-    // ── Agent execution ───────────────────────────────────────────────────────
+    // ── Execution Path 1: Embabel AgentPlatform (preferred) ───────────────────
 
     /**
-     * Execute the TravelPlannerAgent's GOAP actions.
-     * The agent class carries real Embabel annotations — when AgentPlatform is
-     * present at runtime, Embabel's GOAP planner drives execution. Here we call
-     * the action methods directly with CompletableFuture parallelism, which
-     * mirrors the GOAP plan (all search actions take TravelRequest → parallel,
-     * synthesize takes all results → sequential last).
+     * Drive the trip through Embabel's GOAP planner. The planner reads the
+     * {@code @Agent}/{@code @Action}/{@code @AchievesGoal} annotations on
+     * {@link TravelPlannerAgent}, computes a plan (TravelRequest → parallel
+     * search/intel actions → synthesis → UnforgettableItinerary), and runs it.
      */
-    private UnforgettableItinerary executeAgentPlan(TravelRequest request, String sessionId) {
-        // Phase 1: all search/intelligence actions in parallel
-        // (These correspond to GOAP actions that all have TravelRequest as sole input type)
+    private UnforgettableItinerary runViaEmbabelGoap(TravelRequest request, String sessionId) {
+        try {
+            log.info("Running trip via Embabel AgentPlatform (GOAP)");
+            // Seed the blackboard with the TravelRequest and kick off the agent
+            AgentProcess process = agentPlatform.runAgentFrom(
+                travelPlannerAgent,
+                Map.of("travelRequest", request)
+            );
+            Object result = process.resultOfType(UnforgettableItinerary.class);
+            if (result instanceof UnforgettableItinerary it) {
+                return it;
+            }
+            log.warn("Embabel process returned unexpected type {} — falling back to virtual-thread path",
+                result == null ? "null" : result.getClass().getName());
+        } catch (Exception e) {
+            log.warn("Embabel execution failed — falling back to virtual-thread path: {}", e.getMessage());
+        }
+        return runViaVirtualThreads(request, sessionId);
+    }
+
+    // ── Execution Path 2: Virtual-thread fan-out (fallback) ───────────────────
+
+    /**
+     * Invoke the planner's GOAP action methods directly on the virtual-thread
+     * executor. Mirrors the GOAP plan: the four Phase 1 actions all take
+     * {@code TravelRequest} as sole input so the planner runs them in parallel;
+     * the synthesis action requires all Phase 1 outputs so it runs last.
+     */
+    private UnforgettableItinerary runViaVirtualThreads(TravelRequest request, String sessionId) {
+        log.info("Running trip via virtual-thread fan-out (no AgentPlatform bean)");
+
         CompletableFuture<TravelIntelligence> intelligenceFuture =
-            CompletableFuture.supplyAsync(() -> travelPlannerAgent.gatherIntelligence(request));
+            CompletableFuture.supplyAsync(() -> travelPlannerAgent.gatherIntelligence(request), agentExecutor);
         CompletableFuture<AccommodationResults> accommodationFuture =
-            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchAccommodations(request));
+            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchAccommodations(request), agentExecutor);
         CompletableFuture<TransportResults> transportFuture =
-            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchTransport(request));
+            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchTransport(request), agentExecutor);
         CompletableFuture<AttractionResults> attractionsFuture =
-            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchAttractions(request));
+            CompletableFuture.supplyAsync(() -> travelPlannerAgent.searchAttractions(request), agentExecutor);
 
         CompletableFuture.allOf(
             intelligenceFuture, accommodationFuture, transportFuture, attractionsFuture
         ).join();
 
-        // Check budget mid-flight before expensive synthesis
+        // Mid-flight budget check before expensive synthesis
         if (sessionId != null && costTracker.isBudgetExceeded(sessionId)) {
             log.warn("Session {} budget exceeded mid-execution — returning raw results", sessionId);
             TravelIntelligence intel = intelligenceFuture.join();
@@ -124,7 +175,6 @@ public class TravelService {
             );
         }
 
-        // Phase 2: synthesize (GOAP terminal action — needs all Phase 1 outputs)
         return travelPlannerAgent.synthesize(
             request,
             intelligenceFuture.join(),
@@ -136,11 +186,6 @@ public class TravelService {
 
     // ── Session ID propagation ────────────────────────────────────────────────
 
-    /**
-     * Create a copy of TravelRequest with the sessionId injected.
-     * The controller receives sessionId as a query param, separate from the
-     * JSON body. This ensures all agents, cost tracking, and SSE use it.
-     */
     private TravelRequest withSessionId(TravelRequest r, String sessionId) {
         return new TravelRequest(
             r.destination(), r.destinations(), r.startDate(), r.endDate(),
@@ -203,6 +248,10 @@ public class TravelService {
     public List<UnforgettableItinerary> searchItineraries(String destination) {
         return repository.findByDestinationContainingIgnoreCaseOrderByCreatedAtDesc(destination)
             .stream().map(this::toItinerary).collect(Collectors.toList());
+    }
+
+    public UnforgettableItinerary getItinerary(String id) {
+        return repository.findById(id).map(this::toItinerary).orElse(null);
     }
 
     // ── SSE helper ────────────────────────────────────────────────────────────

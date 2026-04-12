@@ -7,10 +7,15 @@ the service launches a browser-use Agent, visits real websites, extracts structu
 and returns JSON results.
 
 Environment variables:
-  ANTHROPIC_API_KEY   - Anthropic API key (preferred LLM for reasoning)
-  OPENAI_API_KEY      - OpenAI API key (fallback)
-  OPENROUTER_API_KEY  - OpenRouter key (fallback)
-  DEFAULT_MODEL       - e.g. "anthropic/claude-3-5-sonnet-20241022"
+  ANTHROPIC_API_KEY   - Anthropic API key (cloud LLM)
+  OPENAI_API_KEY      - OpenAI API key (cloud LLM)
+  OPENROUTER_API_KEY  - OpenRouter key (cloud LLM aggregator)
+  LMSTUDIO_BASE_URL   - LM Studio OpenAI-compatible endpoint (e.g. http://host:1234/v1)
+  OLLAMA_BASE_URL     - Ollama endpoint (e.g. http://host:11434)
+  DEFAULT_MODEL       - Prefix-routed model string. Supported prefixes:
+                          anthropic/..., openai/..., openrouter/...,
+                          lmstudio/..., ollama/...
+                          e.g. "lmstudio/llama-3.1-70b-instruct"
   MAX_CONCURRENT      - Max parallel browser sessions (default: 5)
   BROWSER_HEADLESS    - Run browsers headless (default: true)
   LOG_LEVEL           - Logging level (default: INFO)
@@ -47,6 +52,8 @@ DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "anthropic/claude-3-5-sonnet-20241022
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+LMSTUDIO_BASE_URL = os.getenv("LMSTUDIO_BASE_URL", "http://host.docker.internal:1234/v1")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 
 # Semaphore to cap concurrent browser sessions
 _semaphore: asyncio.Semaphore = None  # initialised in lifespan
@@ -139,12 +146,45 @@ def build_llm(model_string: Optional[str]):
             timeout=90,
         )
 
-    # fallback: treat as an Anthropic model name
-    return ChatAnthropic(
-        model=model_string,
-        api_key=ANTHROPIC_API_KEY,
-        timeout=90,
-        max_tokens=4096,
+    # ── Local LLMs (NAS / self-hosted) ─────────────────────────────────────
+    # Both expose an OpenAI-compatible /v1/chat/completions endpoint. The
+    # api_key value is a dummy — LM Studio and Ollama don't enforce auth, but
+    # langchain_openai's ChatOpenAI requires a non-empty string.
+    if model_string.startswith("lmstudio/"):
+        model_name = model_string.split("/", 1)[1]
+        return ChatOpenAI(
+            model=model_name,
+            api_key="lm-studio",
+            base_url=LMSTUDIO_BASE_URL,
+            timeout=120,
+        )
+
+    if model_string.startswith("ollama/"):
+        model_name = model_string.split("/", 1)[1]
+        # Ollama's OpenAI-compatible endpoint lives at /v1
+        base = OLLAMA_BASE_URL.rstrip("/")
+        if not base.endswith("/v1"):
+            base = base + "/v1"
+        return ChatOpenAI(
+            model=model_name,
+            api_key="ollama",
+            base_url=base,
+            timeout=180,  # local models can be slow, especially first token
+        )
+
+    # fallback: treat as an Anthropic model name only if we actually have a key;
+    # otherwise surface a clear error so the Java side can fall back gracefully.
+    if ANTHROPIC_API_KEY:
+        return ChatAnthropic(
+            model=model_string,
+            api_key=ANTHROPIC_API_KEY,
+            timeout=90,
+            max_tokens=4096,
+        )
+    raise ValueError(
+        f"Cannot resolve model '{model_string}' — no matching provider prefix "
+        f"(anthropic/, openai/, openrouter/, lmstudio/, ollama/) and no "
+        f"ANTHROPIC_API_KEY set for the fallback path."
     )
 
 
