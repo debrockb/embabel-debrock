@@ -130,7 +130,10 @@ class TravelServiceDispatchTest {
     }
 
     @Test
-    void lazyResolutionOnlyHappensOnce() {
+    void successfulResolutionIsCachedPermanently() {
+        // Even an empty map (no AgentPlatform) is a "resolved" state when no
+        // exception is thrown — but since platform is null, it's a "no beans" result.
+        // Successful resolution (no exception) within the retry window should not re-resolve.
         when(applicationContext.getBeansOfType(any())).thenReturn(Map.of());
         stubVirtualThreadPath();
 
@@ -139,12 +142,39 @@ class TravelServiceDispatchTest {
             repository, objectMapper, executor, applicationContext
         );
 
-        // Two trips — Embabel resolution should only happen once
+        // Two rapid trips — resolution should not retry within the 60s window
         service.planTrip(testRequest, "session-a");
         service.planTrip(testRequest, "session-b");
 
-        // getBeansOfType called exactly once (lazy, then cached)
+        // getBeansOfType called only once (cached within retry interval)
         verify(applicationContext, times(1)).getBeansOfType(any());
+    }
+
+    @Test
+    void failedResolutionRetriesAfterInterval() throws Exception {
+        // First call fails (LLM not up yet)
+        when(applicationContext.getBeansOfType(any()))
+            .thenThrow(new RuntimeException("Default LLM not found"))
+            .thenReturn(Map.of()); // second call succeeds (returns empty — no platform)
+        stubVirtualThreadPath();
+
+        TravelService service = new TravelService(
+            travelPlannerAgent, progressService, costTracker,
+            repository, objectMapper, executor, applicationContext
+        );
+
+        // First trip — resolution fails, uses fallback
+        service.planTrip(testRequest, "session-1");
+        verify(applicationContext, times(1)).getBeansOfType(any());
+
+        // Use reflection to simulate the retry interval having elapsed
+        java.lang.reflect.Field failureField = TravelService.class.getDeclaredField("embabelLastFailure");
+        failureField.setAccessible(true);
+        failureField.setLong(service, System.currentTimeMillis() - 61_000); // 61s ago
+
+        // Second trip — should retry resolution (interval elapsed)
+        service.planTrip(testRequest, "session-2");
+        verify(applicationContext, times(2)).getBeansOfType(any());
     }
 
     /**

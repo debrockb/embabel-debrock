@@ -68,6 +68,10 @@ public class TravelService {
     private volatile Object agentPlatform;       // com.embabel.agent.core.AgentPlatform
     private volatile Object embabelAgentWrapper;  // com.embabel.agent.core.Agent
     private volatile boolean embabelResolved = false;
+    /** Epoch millis of last failed resolution — retry after {@link #EMBABEL_RETRY_INTERVAL_MS}. */
+    private volatile long embabelLastFailure = 0;
+    /** Retry Embabel resolution every 60s after a failure, so if LM Studio comes online later the app picks it up. */
+    private static final long EMBABEL_RETRY_INTERVAL_MS = 60_000;
 
     public TravelService(
             TravelPlannerAgent travelPlannerAgent,
@@ -95,9 +99,13 @@ public class TravelService {
      * null — the virtual-thread fallback path handles the trip instead.
      */
     private void resolveEmbabelLazily() {
-        if (embabelResolved) return;
+        if (embabelResolved && agentPlatform != null) return; // success is permanent
+        // On failure, retry after EMBABEL_RETRY_INTERVAL_MS so a late-starting
+        // LM Studio / Ollama is picked up without a full backend restart.
+        if (embabelResolved && System.currentTimeMillis() - embabelLastFailure < EMBABEL_RETRY_INTERVAL_MS) return;
         synchronized (this) {
-            if (embabelResolved) return;
+            if (embabelResolved && agentPlatform != null) return;
+            if (embabelResolved && System.currentTimeMillis() - embabelLastFailure < EMBABEL_RETRY_INTERVAL_MS) return;
             try {
                 Class<?> platformType = Class.forName("com.embabel.agent.core.AgentPlatform");
                 Map<String, ?> platforms = applicationContext.getBeansOfType(platformType);
@@ -107,12 +115,15 @@ public class TravelService {
                     this.embabelAgentWrapper = resolveEmbabelAgent(applicationContext);
                 } else {
                     log.info("No AgentPlatform bean found — using virtual-thread fallback");
+                    this.embabelLastFailure = System.currentTimeMillis();
                 }
             } catch (Exception e) {
                 log.warn("Embabel AgentPlatform unavailable (LLM provider not reachable?). " +
-                    "Falling back to virtual-thread dispatch. Cause: {}", e.getMessage());
+                    "Will retry in {}s. Falling back to virtual-thread dispatch. Cause: {}",
+                    EMBABEL_RETRY_INTERVAL_MS / 1000, e.getMessage());
                 this.agentPlatform = null;
                 this.embabelAgentWrapper = null;
+                this.embabelLastFailure = System.currentTimeMillis();
             }
             embabelResolved = true;
             log.info("Embabel resolution complete — AgentPlatform={}, EmbabelAgent={}",
