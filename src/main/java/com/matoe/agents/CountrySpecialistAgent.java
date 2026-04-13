@@ -37,7 +37,7 @@ public class CountrySpecialistAgent {
     @Value("${travel-agency.prompts.country-specialist}")
     private String defaultPrompt;
 
-    @Value("${travel-agency.models.country-specialist:lmstudio/llama-3-8b}")
+    @Value("${travel-agency.models.country-specialist:lmstudio/nemotron-3-nano:4b}")
     private String defaultModel;
 
     @Value("${travel-agency.browser.country-sites:lonelyplanet.com,wikivoyage.org,tripadvisor.com}")

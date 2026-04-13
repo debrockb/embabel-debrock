@@ -62,7 +62,7 @@ public class OrchestratorAgent {
             Map<String, Object> currencyInfo) {
 
         String model = request.orchestratorModel();
-        if (model == null || model.isBlank()) model = "lmstudio/llama-3-8b";
+        if (model == null || model.isBlank()) model = "lmstudio/qwen3.5:9b";
 
         // Build the synthesis prompt with all gathered data
         String systemPrompt = dynamicPromptService.getPrompt("orchestrator");
