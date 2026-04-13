@@ -7,7 +7,7 @@
 # browser-use 0.1.48 requires langchain-openai>=0.3.11 (per its install_requires).
 # Pinning an older langchain-openai causes ResolutionImpossible at `pip install` —
 # always bump these two together.
-browser-use==0.1.48
+browser-use[memory]==0.1.48
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 pydantic==2.10.4

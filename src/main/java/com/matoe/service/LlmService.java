@@ -57,6 +57,14 @@ public class LlmService {
     @Value("${openrouter.base-url:https://openrouter.ai/api/v1}")
     private String openRouterBaseUrl;
 
+    /** Timeout for cloud LLM calls (Anthropic, OpenRouter). */
+    @Value("${matoe.llm.timeout-cloud-seconds:120}")
+    private int timeoutCloudSeconds;
+
+    /** Timeout for local LLM calls (LM Studio, Ollama) — higher because NAS hardware is slower. */
+    @Value("${matoe.llm.timeout-local-seconds:300}")
+    private int timeoutLocalSeconds;
+
     public LlmService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
         this.webClient = webClientBuilder.build();
         this.objectMapper = objectMapper;
@@ -88,19 +96,19 @@ public class LlmService {
         } else if (modelString.startsWith("lmstudio/")) {
             return callOpenAiCompatible(
                 stripPrefix(modelString), lmStudioUrl, null,
-                systemPrompt, userPrompt, "LM Studio"
+                systemPrompt, userPrompt, "LM Studio", timeoutLocalSeconds
             );
         } else if (modelString.startsWith("ollama/")) {
             return callOpenAiCompatible(
                 stripPrefix(modelString), ollamaUrl, null,
-                systemPrompt, userPrompt, "Ollama"
+                systemPrompt, userPrompt, "Ollama", timeoutLocalSeconds
             );
         } else if (modelString.startsWith("openrouter/")) {
             // "openrouter/openai/gpt-4o" → model = "openai/gpt-4o"
             String model = modelString.substring("openrouter/".length());
             return callOpenAiCompatible(
                 model, openRouterBaseUrl, openRouterApiKey,
-                systemPrompt, userPrompt, "OpenRouter"
+                systemPrompt, userPrompt, "OpenRouter", timeoutCloudSeconds
             );
         }
 
@@ -133,7 +141,7 @@ public class LlmService {
                           .flatMap(err -> Mono.error(new RuntimeException("Anthropic error: " + err)))
                 )
                 .bodyToMono(Map.class)
-                .block(Duration.ofSeconds(120));
+                .block(Duration.ofSeconds(timeoutCloudSeconds));
 
             if (response == null) throw new RuntimeException("Null response from Anthropic");
             List<?> content = (List<?>) response.get("content");
@@ -152,7 +160,7 @@ public class LlmService {
 
     private String callOpenAiCompatible(
             String model, String baseUrl, String apiKey,
-            String systemPrompt, String userPrompt, String label) {
+            String systemPrompt, String userPrompt, String label, int timeoutSeconds) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", model);
@@ -182,7 +190,7 @@ public class LlmService {
                           .flatMap(err -> Mono.error(new RuntimeException(label + " error: " + err)))
                 )
                 .bodyToMono(Map.class)
-                .block(Duration.ofSeconds(120));
+                .block(Duration.ofSeconds(timeoutSeconds));
 
             if (response == null) throw new RuntimeException("Null response from " + label);
             List<?> choices = (List<?>) response.get("choices");

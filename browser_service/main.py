@@ -214,6 +214,9 @@ def parse_result(raw: str) -> Any:
     import json
     import re
 
+    if not raw or raw.strip() in ("None", "null", ""):
+        return None
+
     # Strip markdown fences
     cleaned = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("```").strip()
 
@@ -263,7 +266,16 @@ async def browse(req: BrowseRequest):
         _active_sessions += 1
         start = time.time()
         try:
-            llm = build_llm(req.model)
+            # browser-use sends screenshots to the LLM for visual browsing, so the
+            # model MUST support image inputs. Always use DEFAULT_MODEL (which should
+            # be a vision-capable model like qwen3.5:9b) regardless of what the Java
+            # backend requested — the backend's model preference is for text extraction,
+            # not visual browsing.
+            browser_model = DEFAULT_MODEL
+            if req.model and req.model.strip():
+                log.info("Backend requested model=%s, but browser-use requires vision — using DEFAULT_MODEL=%s",
+                         req.model, DEFAULT_MODEL)
+            llm = build_llm(browser_model)
 
             # Build the full task description
             full_task = req.task
@@ -288,7 +300,8 @@ async def browse(req: BrowseRequest):
                     timeout=req.timeout_seconds,
                 )
 
-                raw_text = str(result_obj.final_result()) if result_obj else ""
+                final = result_obj.final_result() if result_obj else None
+                raw_text = str(final) if final is not None else ""
                 parsed = parse_result(raw_text)
                 duration = time.time() - start
 
