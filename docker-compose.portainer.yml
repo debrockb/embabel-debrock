@@ -74,6 +74,8 @@ services:
       BROWSER_SERVICE_URL: http://matoe-browser-lb:80
       BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-true}
       REDIS_HOST: matoe-redis
+      ZIPKIN_ENDPOINT: http://matoe-zipkin:9411/api/v2/spans
+      MATOE_TRACE_SAMPLING: ${MATOE_TRACE_SAMPLING:-0.1}
       # Admin token is required in production — backend will refuse to start if unset.
       MATOE_ADMIN_TOKEN: ${MATOE_ADMIN_TOKEN:?MATOE_ADMIN_TOKEN must be set in Portainer Stack env}
       # Default CORS locked to the internal frontend origin only.
@@ -82,6 +84,8 @@ services:
       matoe-postgres:
         condition: service_healthy
       matoe-browser-lb:
+        condition: service_started
+      matoe-zipkin:
         condition: service_started
     networks:
       - matoe-network
@@ -220,6 +224,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  matoe-zipkin:
+    image: openzipkin/zipkin-slim:3
+    container_name: MATOE-Zipkin
+    ports:
+      - "${MATOE_ZIPKIN_PORT:-9411}:9411"
+    networks:
+      - matoe-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   matoe-redis:

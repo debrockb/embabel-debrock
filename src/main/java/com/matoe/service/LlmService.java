@@ -1,6 +1,7 @@
 package com.matoe.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -72,6 +73,8 @@ public class LlmService {
      * @param modelString e.g. "anthropic/claude-3-5-sonnet", "lmstudio/llama-3-8b",
      *                    "ollama/mistral", "openrouter/openai/gpt-4o"
      */
+    @Observed(name = "matoe.llm.call", contextualName = "llm-call",
+             lowCardinalityKeyValues = {"component", "llm-service"})
     @Cacheable(value = "llm-responses", unless = "#result == null")
     public String call(String modelString, String systemPrompt, String userPrompt) {
         if (modelString == null || modelString.isBlank()) {

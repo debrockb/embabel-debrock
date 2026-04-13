@@ -25,12 +25,15 @@ services:
       # Browser service load-balanced via nginx
       BROWSER_SERVICE_URL: http://browser-lb:80
       REDIS_HOST: redis
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       postgres:
         condition: service_healthy
       browser-lb:
         condition: service_started
       redis:
+        condition: service_started
+      zipkin:
         condition: service_started
     networks:
       - matoe-network
@@ -154,6 +157,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  # ─── Zipkin (distributed tracing UI) ──────────────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin-slim:3
+    ports:
+      - "9411:9411"
+    networks:
+      - matoe-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   # ─── Redis (session cache, rate limiting) ────────────────────────────────

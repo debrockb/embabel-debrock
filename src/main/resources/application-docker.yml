@@ -19,3 +19,12 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration/postgres
+
+## Zipkin endpoint inside the Docker network
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  tracing:
+    sampling:
+      probability: ${MATOE_TRACE_SAMPLING:0.1}

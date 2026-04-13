@@ -7,6 +7,7 @@ import com.matoe.agents.TravelPlannerAgent.*;
 import com.matoe.domain.*;
 import com.matoe.entity.ItineraryEntity;
 import com.matoe.repository.ItineraryRepository;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -176,6 +177,8 @@ public class TravelService {
 
     // ── public API ────────────────────────────────────────────────────────────
 
+    @Observed(name = "matoe.trip.plan", contextualName = "plan-trip",
+             lowCardinalityKeyValues = {"component", "travel-service"})
     @CacheEvict(value = "itineraries", allEntries = true)
     public UnforgettableItinerary planTrip(TravelRequest request, String sessionId) {
         TravelRequest enriched = withSessionId(request, sessionId);

@@ -261,18 +261,30 @@ Flyway location configured per profile:
 | `/api/travel/itineraries` | GET | None | List saved itineraries |
 | `/api/travel/itineraries/search?destination=x` | GET | None | Search itineraries |
 | `/api/travel/health` | GET | None | Health check |
-| `/api/admin/prompts` | GET | None | List all agent prompts |
-| `/api/admin/prompts/{agentName}` | GET/POST | POST: `X-Admin-Token` | Get/update prompt |
+| `/api/admin/prompts` | GET | `X-Admin-Token` | List all agent prompts |
+| `/api/admin/prompts/{agentName}` | GET/POST | `X-Admin-Token` | Get/update prompt |
 | `/api/admin/prompts/{agentName}/rollback/{version}` | POST | `X-Admin-Token` | Rollback prompt |
-| `/api/admin/costs?hours=24` | GET | None | Cost dashboard |
-| `/api/admin/costs/session/{sessionId}` | GET | None | Session cost |
-| `/api/admin/search-targets` | GET/POST | POST: `X-Admin-Token` | List/add search targets |
+| `/api/admin/costs?hours=24` | GET | `X-Admin-Token` | Cost dashboard |
+| `/api/admin/costs/session/{sessionId}` | GET | `X-Admin-Token` | Session cost |
+| `/api/admin/search-targets` | GET/POST | `X-Admin-Token` | List/add search targets |
 | `/api/admin/search-targets/{id}` | PUT/DELETE | `X-Admin-Token` | Update/delete target |
-| `/api/admin/status` | GET | None | System status |
+| `/api/admin/status` | GET | `X-Admin-Token` | System status |
+| `/api/actuator/health` | GET | None | Spring Actuator health |
+| `/api/actuator/metrics` | GET | None | Micrometer metrics |
+| `/api/actuator/prometheus` | GET | None | Prometheus scrape endpoint |
+
+### Observability (OpenTelemetry / Zipkin)
+
+- **Distributed tracing:** Micrometer Tracing → OpenTelemetry bridge → Zipkin exporter. Every trip planning request produces a trace spanning LLM calls, browser dispatches, agent actions, and synthesis.
+- **Zipkin UI:** `http://localhost:9411` (local dev) or `http://<NAS>:9411` (Portainer). Search by service name `matoe`.
+- **Prometheus metrics:** `/api/actuator/prometheus` — scrape-ready endpoint with `matoe.*` custom metrics plus Spring Boot auto-metrics.
+- **`@Observed` spans:** `TravelService.planTrip`, `LlmService.call`, `BrowserAgentService.browseForList/browseForMap`, all 5 `TravelPlannerAgent` GOAP actions (gather-intelligence, search-accommodations, search-transport, search-attractions, synthesize-itinerary).
+- **Sampling:** 100% local dev (`MATOE_TRACE_SAMPLING=1.0`), 10% Docker/NAS (`0.1`). Configurable via env var.
+- **Config bean:** `ObservabilityConfig` registers `ObservedAspect` for annotation-driven span creation.
 
 ### Security
 
-- **Admin mutations** require `X-Admin-Token` header matching `MATOE_ADMIN_TOKEN` env var. If env var is empty, auth is disabled (open access).
+- **All admin endpoints** require `X-Admin-Token` header matching `MATOE_ADMIN_TOKEN` env var. If env var is empty, auth is disabled (open access).
 - **CORS** configured via `matoe.cors.allowed-origins` (default: `http://localhost:3000,http://localhost:80`)
 - **Docker:** PostgreSQL and Redis ports are NOT exposed to the host (internal network only)
 - **Synthetic data:** LLM-generated results tagged `source=llm`, Book links hidden in frontend, "AI-generated estimate" warning shown
@@ -281,7 +293,7 @@ Flyway location configured per profile:
 
 - **Spring profiles:** `SPRING_PROFILES_ACTIVE=docker` activates `application-docker.yml` (PostgreSQL dialect, driver, Flyway postgres location)
 - **NAS networking:** `extra_hosts: ["host.docker.internal:host-gateway"]` on backend service for Linux Docker hosts
-- **Memory budget:** Backend 2GB, browser 1GB (1 instance), PostgreSQL ~512MB, Redis ~256MB. Total ~4GB. Fits 16GB NAS.
+- **Memory budget:** Backend 2GB, browser 1GB (1 instance), PostgreSQL ~512MB, Redis ~256MB, Zipkin ~256MB. Total ~4.5GB. Fits 16GB NAS.
 - **Browser scaling:** Default 1 instance. Add `browser-2`, `browser-3` in docker-compose.yml and uncomment in `browser_service/nginx.conf` to scale.
 - **Browser process safety:** `main.py` wraps browser agent in `try/finally` with `await browser.close()` to prevent Chromium leaks.
 
@@ -308,6 +320,9 @@ Cost tracking: `travel-agency.cost-tracking.per-session-budget-usd` (default $2.
 | `BROWSER_SERVICE_ENABLED` | Enable/disable browser | `true` |
 | `MATOE_ADMIN_TOKEN` | Admin API auth token | (empty = no auth) |
 | `MATOE_CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000,http://localhost:80` |
+| `ZIPKIN_ENDPOINT` | Zipkin spans endpoint | `http://localhost:9411/api/v2/spans` |
+| `MATOE_TRACE_SAMPLING` | Trace sampling probability (0.0–1.0) | `1.0` (local), `0.1` (Docker) |
+| `MATOE_ZIPKIN_PORT` | Host port for Zipkin UI (Portainer) | `9411` |
 | `SPRING_PROFILES_ACTIVE` | Spring profile | (empty = SQLite) |
 
 ### Key Design Constraints

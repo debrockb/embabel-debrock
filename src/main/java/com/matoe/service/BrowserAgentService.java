@@ -2,6 +2,7 @@ package com.matoe.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,6 +70,8 @@ public class BrowserAgentService {
      * @param extractionHint  JSON schema hint for the expected output format
      * @param model           LLM model to use for browser reasoning
      */
+    @Observed(name = "matoe.browser.browse", contextualName = "browser-browse-list",
+             lowCardinalityKeyValues = {"component", "browser-service"})
     public List<Map<String, Object>> browseForList(
             String task, List<String> sites, String extractionHint, String model) {
         try {
@@ -98,6 +101,8 @@ public class BrowserAgentService {
     /**
      * Browse for a single JSON object (Map), e.g. country insights.
      */
+    @Observed(name = "matoe.browser.browse", contextualName = "browser-browse-map",
+             lowCardinalityKeyValues = {"component", "browser-service"})
     public Map<String, Object> browseForMap(
             String task, List<String> sites, String extractionHint, String model) {
         try {

@@ -243,6 +243,28 @@ matoe:
   cors:
     allowed-origins: ${MATOE_CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 
+# ─── Observability (Actuator + Micrometer Tracing → Zipkin) ────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  tracing:
+    sampling:
+      probability: ${MATOE_TRACE_SAMPLING:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+  observations:
+    annotations:
+      enabled: true
+  metrics:
+    tags:
+      application: matoe
+
 logging:
   level:
     root: INFO

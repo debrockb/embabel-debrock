@@ -5,6 +5,7 @@ import com.embabel.agent.api.annotation.Action;
 import com.embabel.agent.api.annotation.Agent;
 import com.matoe.domain.*;
 import com.matoe.service.AgentProgressService;
+import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -111,6 +112,8 @@ public class TravelPlannerAgent {
      * GOAP precondition: TravelRequest on blackboard.
      * GOAP effect: TravelIntelligence on blackboard.
      */
+    @Observed(name = "matoe.agent.intelligence", contextualName = "gather-intelligence",
+             lowCardinalityKeyValues = {"component", "travel-planner"})
     @Action(description = "Gather regional insights, weather, currency, and reviews for the destination")
     public TravelIntelligence gatherIntelligence(TravelRequest request) {
         String sid = request.sessionId();
@@ -154,6 +157,8 @@ public class TravelPlannerAgent {
      * GOAP precondition: TravelRequest on blackboard.
      * GOAP effect: AccommodationResults on blackboard.
      */
+    @Observed(name = "matoe.agent.accommodations", contextualName = "search-accommodations",
+             lowCardinalityKeyValues = {"component", "travel-planner"})
     @Action(description = "Search accommodations across all requested types")
     public AccommodationResults searchAccommodations(TravelRequest request) {
         String sid = request.sessionId();
@@ -234,6 +239,8 @@ public class TravelPlannerAgent {
     /**
      * Search all requested transport types in parallel.
      */
+    @Observed(name = "matoe.agent.transport", contextualName = "search-transport",
+             lowCardinalityKeyValues = {"component", "travel-planner"})
     @Action(description = "Search transport across all requested types")
     public TransportResults searchTransport(TravelRequest request) {
         String sid = request.sessionId();
@@ -313,6 +320,8 @@ public class TravelPlannerAgent {
     /**
      * Search attractions and experiences.
      */
+    @Observed(name = "matoe.agent.attractions", contextualName = "search-attractions",
+             lowCardinalityKeyValues = {"component", "travel-planner"})
     @Action(description = "Search attractions and experiences at the destination")
     public AttractionResults searchAttractions(TravelRequest request) {
         String sid = request.sessionId();
@@ -328,6 +337,8 @@ public class TravelPlannerAgent {
      *                     TransportResults, AttractionResults all on blackboard.
      * GOAP effect: UnforgettableItinerary (the goal type).
      */
+    @Observed(name = "matoe.agent.synthesize", contextualName = "synthesize-itinerary",
+             lowCardinalityKeyValues = {"component", "travel-planner"})
     @AchievesGoal(description = "Plan an unforgettable trip with 3 tier variants and day-by-day breakdown")
     @Action(description = "Synthesize all search results into a final 3-tier itinerary")
     public UnforgettableItinerary synthesize(

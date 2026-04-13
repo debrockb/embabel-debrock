@@ -85,6 +85,13 @@ dependencies {
     // PDF export (iText)
     implementation("com.itextpdf:itext7-core:8.0.2")
 
+    // Observability — Actuator + Micrometer Tracing → Zipkin
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    implementation("io.opentelemetry:opentelemetry-exporter-zipkin")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+
     // Logging
     implementation("org.springframework.boot:spring-boot-starter-logging")
 

@@ -122,6 +122,10 @@ browser-service:
   max-steps: 5
   enabled: false
 
+management:
+  tracing:
+    enabled: false
+
 logging:
   level:
     root: WARN
