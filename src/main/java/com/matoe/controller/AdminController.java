@@ -199,7 +199,9 @@ public class AdminController {
     // ── System Status ─────────────────────────────────────────────────────────
 
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getSystemStatus() {
+    public ResponseEntity<Map<String, Object>> getSystemStatus(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        requireAuth(token);
         return ResponseEntity.ok(Map.of(
             "status", "running",
             "agents", promptService.getAgentNames(),
