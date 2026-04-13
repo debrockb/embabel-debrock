@@ -15,6 +15,19 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  # ── Embabel cloud-provider autoconfig exclusions ────────────────────────
+  # Embabel's cloud-provider starters (Anthropic, OpenAI, OpenAI-Custom)
+  # eagerly validate API keys at startup and throw IllegalStateException
+  # when keys are empty. For NAS / local-LLM-only deployments this means
+  # the backend crashes before serving traffic. Excluding the autoconfigs
+  # by default lets the app start with just Ollama/LM Studio. To re-enable
+  # cloud providers, set SPRING_PROFILES_ACTIVE=docker,cloud (or just
+  # cloud for local dev) with the corresponding API keys.
+  autoconfigure:
+    exclude:
+      - com.embabel.agent.config.models.anthropic.AnthropicModelsConfig
+      - com.embabel.agent.config.models.openai.OpenAiModelsConfig
+      - com.embabel.agent.config.models.openai.OpenAiCustomModelsConfig
 
 server:
   port: 8080

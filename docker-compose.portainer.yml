@@ -5,20 +5,20 @@
 ## No source checkout required — images pulled from GHCR.
 ##
 ## Images used (multi-arch, built by .github/workflows/publish-images.yml):
-##   ghcr.io/debrockb/embabel-debrock-backend:${MATOE_IMAGE_TAG:-latest}
-##   ghcr.io/debrockb/embabel-debrock-frontend:${MATOE_IMAGE_TAG:-latest}
-##   ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+##   ghcr.io/debrockb/matoe-backend:${MATOE_IMAGE_TAG:-latest}
+##   ghcr.io/debrockb/matoe-frontend:${MATOE_IMAGE_TAG:-latest}
+##   ghcr.io/debrockb/matoe-browser:${MATOE_IMAGE_TAG:-latest}
 ##
 ## ────────────────────────────────────────────────────────────────────────────
 ## GHCR PACKAGE VISIBILITY (one-time, per package)
 ## ────────────────────────────────────────────────────────────────────────────
 ## After the first successful workflow run, the three packages are created
-## under github.com/users/debrockb/packages/container/{backend,frontend,browser}
+## under github.com/users/debrockb/packages/container/matoe-{backend,frontend,browser}
 ## in *Private* visibility. The NAS will not be able to `docker pull` them
 ## anonymously until each is flipped to *Public*:
 ##
 ##   1. Open https://github.com/debrockb?tab=packages
-##   2. Click each of the three embabel-debrock-* packages
+##   2. Click each of the three matoe-* packages
 ##   3. Package settings → "Change visibility" → Public
 ##
 ## Alternatively, keep them private and provide registry credentials to
@@ -46,7 +46,7 @@
 services:
 
   backend:
-    image: ghcr.io/debrockb/embabel-debrock-backend:${MATOE_IMAGE_TAG:-latest}
+    image: ghcr.io/debrockb/matoe-backend:${MATOE_IMAGE_TAG:-latest}
     # Fallback to source build if images are not published yet:
     # build:
     #   context: .
@@ -95,7 +95,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/debrockb/embabel-debrock-frontend:${MATOE_IMAGE_TAG:-latest}
+    image: ghcr.io/debrockb/matoe-frontend:${MATOE_IMAGE_TAG:-latest}
     # Fallback to source build:
     # build:
     #   context: ./frontend
@@ -110,7 +110,7 @@ services:
     restart: unless-stopped
 
   browser-1:
-    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+    image: ghcr.io/debrockb/matoe-browser:${MATOE_IMAGE_TAG:-latest}
     # build:
     #   context: ./browser_service
     #   dockerfile: Dockerfile
@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
 
   browser-2:
-    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+    image: ghcr.io/debrockb/matoe-browser:${MATOE_IMAGE_TAG:-latest}
     container_name: MATOE-Browser-2
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -161,7 +161,7 @@ services:
     restart: unless-stopped
 
   browser-3:
-    image: ghcr.io/debrockb/embabel-debrock-browser:${MATOE_IMAGE_TAG:-latest}
+    image: ghcr.io/debrockb/matoe-browser:${MATOE_IMAGE_TAG:-latest}
     container_name: MATOE-Browser-3
     extra_hosts:
       - "host.docker.internal:host-gateway"

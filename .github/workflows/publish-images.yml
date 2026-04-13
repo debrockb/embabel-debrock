@@ -28,7 +28,6 @@ jobs:
   publish:
     name: Build & push ${{ matrix.image.name }}
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
