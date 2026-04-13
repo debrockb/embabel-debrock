@@ -1,13 +1,14 @@
 package com.matoe.agents;
 
-import com.matoe.annotations.Action;
-import com.matoe.annotations.AchievesGoal;
-import com.matoe.annotations.Agent;
+import com.embabel.agent.api.annotation.AchievesGoal;
+import com.embabel.agent.api.annotation.Action;
+import com.embabel.agent.api.annotation.Agent;
 import com.matoe.domain.*;
 import com.matoe.service.AgentProgressService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +29,7 @@ import java.util.concurrent.ExecutorService;
  * Actions with independent preconditions (all only need TravelRequest)
  * run in parallel when embabel.agent.platform.process-type=CONCURRENT.
  */
+@Component
 @Agent(
     name = "TravelPlanner",
     description = "Plan an unforgettable multi-day trip with accommodation, transport, and attractions"

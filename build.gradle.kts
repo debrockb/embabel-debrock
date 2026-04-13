@@ -1,7 +1,12 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.2.4"
-    id("io.spring.dependency-management") version "1.1.4"
+    // Spring Boot 3.3.5 ships Spring Framework 6.1.14, whose bundled ASM reader
+    // can parse Embabel 0.3.5's Kotlin-compiled bytecode. Spring Boot 3.2.x
+    // (Spring Framework 6.1.5) crashed during component scanning with
+    //   java.lang.IllegalArgumentException at Enum.java:293
+    // while reading embabel-agent-api-0.3.5.jar's AgenticEvent.class.
+    id("org.springframework.boot") version "3.3.5"
+    id("io.spring.dependency-management") version "1.1.6"
 }
 
 group = "com.matoe"
@@ -10,8 +15,7 @@ java.sourceCompatibility = JavaVersion.VERSION_21
 
 repositories {
     mavenCentral()
-    // Embabel Agent Framework repositories — kept for the day we re-introduce
-    // the starter. Not currently resolving any deps (see below).
+    // Embabel 0.3.5 is published to Embabel's Artifactory, not Maven Central.
     maven {
         name = "EmbabelReleases"
         url = uri("https://repo.embabel.com/artifactory/libs-release")
@@ -29,32 +33,18 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    // ─── Embabel Agent Framework 0.3.5 — TEMPORARILY DISABLED ────────────────
-    //
-    // Embabel 0.3.5's `embabel-agent-api.jar` ships
-    // `com.embabel.agent.api.event.AgenticEvent.class` with bytecode that
-    // Spring Boot 3.2.4's ASM reader (Spring Framework 6.1.5) cannot parse
-    // during component scanning. The failure surfaces as
-    //   BeanDefinitionStoreException: Failed to read candidate component
-    //   class ... Caused by: java.lang.IllegalArgumentException at Enum.java
-    // and blocks the Spring ApplicationContext from loading — i.e. both
-    // ./gradlew bootRun and the @SpringBootTest contextLoads test fail.
-    //
-    // Our TravelService already talks to AgentPlatform reflectively with a
-    // full virtual-thread fallback, so removing the starter is a no-op at
-    // runtime: the fallback path is the actual working execution strategy
-    // and mirrors the GOAP plan exactly. Re-introduce these when either (a)
-    // Embabel ships a build compatible with Spring 6.1.x ASM, or (b) the
-    // project upgrades to Spring Boot 3.3+.
-    //
-    // implementation("com.embabel.agent:embabel-agent-starter:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-ollama:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-webmvc:0.3.5")
-    // implementation("com.embabel.agent:embabel-agent-starter-observability:0.3.5")
+    // ─── Embabel Agent Framework 0.3.5 ──────────────────────────────────────
+    // Resolved from the Embabel Artifactory (see repositories {} above). These
+    // jars are NOT on Maven Central. The Spring Boot 3.3+ ASM reader parses
+    // their Kotlin-compiled bytecode correctly; Spring Boot 3.2 could not.
+    implementation("com.embabel.agent:embabel-agent-starter:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-ollama:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-webmvc:0.3.5")
+    implementation("com.embabel.agent:embabel-agent-starter-observability:0.3.5")
 
     // JSON & Serialization
     implementation("com.fasterxml.jackson.core:jackson-databind")
@@ -65,11 +55,11 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.xerial:sqlite-jdbc")
     runtimeOnly("org.hibernate.orm:hibernate-community-dialects")
-    // Spring Boot 3.2.4 ships flyway-core 9.22.3 (Flyway 9.x), which bundles
-    // built-in Postgres support directly in flyway-core. The separate
-    // flyway-database-postgresql module only exists in Flyway 10+ (Spring
-    // Boot 3.3+), so we do NOT declare it here — that was the CI failure.
+    // Spring Boot 3.3+ ships Flyway 10.x, which split Postgres support into a
+    // separate runtime module. Declaring it is mandatory for Postgres-backed
+    // profiles; it has no effect on SQLite.
     implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
     // HTTP Client (WebFlux/WebClient for browser-service + LLM calls)
     implementation("org.springframework.boot:spring-boot-starter-webflux")
@@ -89,7 +79,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-core")
-    // testImplementation("com.embabel.agent:embabel-agent-test:0.3.5")  // see above
+    testImplementation("com.embabel.agent:embabel-agent-test:0.3.5")
 }
 
 tasks.withType<Test> {

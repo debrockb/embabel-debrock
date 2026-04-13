@@ -1,4 +1,11 @@
-FROM eclipse-temurin:21-jdk-alpine
+# Stage 1 — build the Spring Boot JAR.
+# NOTE: eclipse-temurin:21-jdk-alpine's musl + Gradle native-platform
+# binaries crash the JVM on some arm64 hosts ("SIGSEGV in
+# libnative-platform-file-events.so") during ./gradlew. Use the glibc
+# (default Debian/Ubuntu) variant — it's larger at build time but the
+# runtime stage still runs on a slim JRE image, so the final image size
+# is unchanged.
+FROM eclipse-temurin:21-jdk AS build
 
 WORKDIR /app
 
@@ -12,10 +19,10 @@ COPY settings.gradle.kts .
 COPY src src/
 
 # Build the application
-RUN ./gradlew build -x test
+RUN chmod +x gradlew && ./gradlew build -x test --no-daemon
 
-# Use multi-stage build to reduce image size
-FROM eclipse-temurin:21-jre-alpine
+# Stage 2 — lean JRE runtime.
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
@@ -23,7 +30,7 @@ WORKDIR /app
 RUN mkdir -p /app/data
 
 # Copy the built JAR
-COPY --from=0 /app/build/libs/*.jar app.jar
+COPY --from=build /app/build/libs/*.jar app.jar
 
 # Expose port
 EXPOSE 8080

@@ -1,5 +1,8 @@
 package com.matoe.service;
 
+import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.core.AgentProcess;
+import com.embabel.agent.core.ProcessOptions;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matoe.agents.TravelPlannerAgent;
@@ -9,11 +12,11 @@ import com.matoe.entity.ItineraryEntity;
 import com.matoe.repository.ItineraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -24,18 +27,17 @@ import java.util.stream.Collectors;
  *
  * <p><b>Execution strategy</b> (in order of preference):
  * <ol>
- *   <li><b>Embabel AgentPlatform</b> — if an {@code AgentPlatform} bean is
- *       available at runtime (resolved reflectively to tolerate Embabel 0.3.x
- *       API drift), execute the trip through Embabel's GOAP planner.
- *       {@link TravelPlannerAgent} carries {@code @Agent} / {@code @Action} /
- *       {@code @AchievesGoal} annotations; the platform chains them by type
- *       and runs independent actions concurrently when
+ *   <li><b>Embabel AgentPlatform</b> — the primary path. The platform scans
+ *       {@link TravelPlannerAgent}'s {@code @Agent} / {@code @Action} /
+ *       {@code @AchievesGoal} annotations, computes a GOAP plan
+ *       (TravelRequest → parallel search/intel actions → synthesis →
+ *       UnforgettableItinerary), and runs it. Independent actions run
+ *       concurrently when
  *       {@code embabel.agent.platform.process-type=CONCURRENT}.</li>
- *   <li><b>Virtual-thread fan-out</b> — if Embabel is not on the classpath or
- *       no platform bean is provided (e.g. tests, stripped deployments), fall
- *       back to a deterministic CompletableFuture dispatch on the
- *       {@code agentExecutor} virtual-thread pool. This mirrors the GOAP plan
- *       exactly: four parallel search/intel actions, then a synthesis step.</li>
+ *   <li><b>Virtual-thread fan-out</b> — a safety net used only if the
+ *       platform bean is unavailable (e.g. a lightweight test slice that
+ *       excludes Embabel autoconfig) or if a platform run fails. Mirrors the
+ *       GOAP plan: four parallel search/intel actions, then synthesis.</li>
  * </ol>
  *
  * <p><b>Session ID propagation</b>: the controller receives sessionId as a
@@ -54,11 +56,8 @@ public class TravelService {
     private final ItineraryRepository repository;
     private final ObjectMapper objectMapper;
     private final ExecutorService agentExecutor;
-    // Held as Object + accessed via reflection to insulate the compile-time
-    // contract from Embabel 0.3.x API drift. We bind by bean-name lookup so the
-    // service compiles cleanly even if the Embabel classpath is absent (tests,
-    // stripped deployments). See runViaEmbabelGoap() for the dispatch logic.
-    private final Object agentPlatform; // may be null
+    /** May be null if Embabel autoconfig is excluded in a given profile. */
+    private final AgentPlatform agentPlatform;
 
     public TravelService(
             TravelPlannerAgent travelPlannerAgent,
@@ -67,30 +66,16 @@ public class TravelService {
             ItineraryRepository repository,
             ObjectMapper objectMapper,
             @Qualifier("agentExecutor") ExecutorService agentExecutor,
-            ApplicationContext applicationContext) {
+            @Autowired(required = false) AgentPlatform agentPlatform) {
         this.travelPlannerAgent = travelPlannerAgent;
         this.progressService = progressService;
         this.costTracker = costTracker;
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.agentExecutor = agentExecutor;
-        this.agentPlatform = resolveAgentPlatform(applicationContext);
+        this.agentPlatform = agentPlatform;
         log.info("TravelService initialised — AgentPlatform={}, executor=virtual-threads",
-            agentPlatform != null ? "PRESENT (GOAP active)" : "absent (fallback mode)");
-    }
-
-    private static Object resolveAgentPlatform(ApplicationContext ctx) {
-        try {
-            Class<?> cls = Class.forName("com.embabel.agent.core.AgentPlatform");
-            Map<String, ?> beans = ctx.getBeansOfType(cls);
-            return beans.isEmpty() ? null : beans.values().iterator().next();
-        } catch (ClassNotFoundException e) {
-            log.info("Embabel AgentPlatform class not on classpath — fallback mode");
-            return null;
-        } catch (Exception e) {
-            log.warn("Failed to resolve AgentPlatform bean: {}", e.getMessage());
-            return null;
-        }
+            agentPlatform != null ? "PRESENT (Embabel GOAP active)" : "absent (fallback mode)");
     }
 
     // ── public API ────────────────────────────────────────────────────────────
@@ -129,92 +114,54 @@ public class TravelService {
     // ── Execution Path 1: Embabel AgentPlatform (preferred) ───────────────────
 
     /**
-     * Drive the trip through Embabel's GOAP planner. Invoked reflectively to
-     * accommodate small API drift across Embabel 0.3.x minor versions (e.g.
-     * the presence / absence of a {@code ProcessOptions} argument on
-     * {@code runAgentFrom}). Any reflective failure — missing class, wrong
-     * arity, runtime exception — drops cleanly through to the virtual-thread
-     * fallback path, which is a fully functional alternative, not a stub.
-     *
-     * <p>The planner reads the {@code @Agent}/{@code @Action}/
-     * {@code @AchievesGoal} annotations on {@link TravelPlannerAgent},
-     * computes a plan (TravelRequest → parallel search/intel actions →
-     * synthesis → UnforgettableItinerary), and runs it.
+     * Drive the trip through Embabel's GOAP planner. The platform reads the
+     * {@code @Agent}/{@code @Action}/{@code @AchievesGoal} annotations on
+     * {@link TravelPlannerAgent}, computes a plan (TravelRequest → parallel
+     * search/intel actions → synthesis → UnforgettableItinerary), and runs it.
+     * A runtime failure drops cleanly through to the virtual-thread fallback.
      */
     private UnforgettableItinerary runViaEmbabelGoap(TravelRequest request, String sessionId) {
         try {
-            log.info("Running trip via Embabel AgentPlatform (GOAP, reflective dispatch)");
+            log.info("Running trip via Embabel AgentPlatform (GOAP planner)");
             Map<String, Object> bindings = Map.of("travelRequest", request);
-            Object process = invokeRunAgentFrom(agentPlatform, travelPlannerAgent, bindings);
-            if (process == null) {
-                log.warn("Embabel runAgentFrom returned null — falling back");
-                return runViaVirtualThreads(request, sessionId);
+            AgentProcess process = agentPlatform.runAgentFrom(
+                travelPlannerAgent, defaultProcessOptions(), bindings);
+            UnforgettableItinerary result = process.resultOfType(UnforgettableItinerary.class);
+            if (result != null) {
+                return result;
             }
-            // Ensure the process has completed (some overloads return eagerly,
-            // others return a handle that needs .run()).
-            try {
-                Method runMethod = process.getClass().getMethod("run");
-                runMethod.invoke(process);
-            } catch (NoSuchMethodException ignored) { /* already ran */ }
-
-            Method resultMethod = process.getClass().getMethod("resultOfType", Class.class);
-            Object result = resultMethod.invoke(process, UnforgettableItinerary.class);
-            if (result instanceof UnforgettableItinerary it) {
-                return it;
-            }
-            log.warn("Embabel process returned unexpected type {} — falling back",
-                result == null ? "null" : result.getClass().getName());
+            log.warn("Embabel process produced no UnforgettableItinerary — falling back");
         } catch (Exception e) {
             log.warn("Embabel execution failed — falling back to virtual-thread path: {}",
-                e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+                e.getMessage());
         }
         return runViaVirtualThreads(request, sessionId);
     }
 
     /**
-     * Calls {@code AgentPlatform.runAgentFrom(...)} against whichever overload
-     * Embabel 0.3.x ships. Tries in order:
-     * <ol>
-     *   <li>{@code runAgentFrom(Agent, ProcessOptions, Map)} — 0.3.5+</li>
-     *   <li>{@code runAgentFrom(Agent, Map)} — older builds</li>
-     * </ol>
+     * {@code ProcessOptions} is a Kotlin class. Its default instance is
+     * exposed as {@code ProcessOptions.DEFAULT} to Java when the Kotlin
+     * declaration uses {@code @JvmField} on a {@code companion object} const.
+     * If that exact JVM-binary shape changes between 0.3.x patch versions,
+     * we fall back to {@code Companion.getDEFAULT()} and finally to a no-arg
+     * constructor, so we do not have to re-release on a trivial API tweak.
      */
-    private static Object invokeRunAgentFrom(Object platform, Object agent,
-                                             Map<String, Object> bindings) throws Exception {
-        Method[] candidates = platform.getClass().getMethods();
-        // Prefer the 3-arg form (Agent, ProcessOptions, Map) — verified shape
-        // in embabel-agent-api-0.3.5.jar by the audit.
-        for (Method m : candidates) {
-            if (!"runAgentFrom".equals(m.getName())) continue;
-            Class<?>[] p = m.getParameterTypes();
-            if (p.length == 3 && Map.class.isAssignableFrom(p[2])) {
-                Object defaultOpts = resolveDefaultProcessOptions();
-                return m.invoke(platform, agent, defaultOpts, bindings);
-            }
-        }
-        // Fall back to 2-arg (Agent, Map)
-        for (Method m : candidates) {
-            if (!"runAgentFrom".equals(m.getName())) continue;
-            Class<?>[] p = m.getParameterTypes();
-            if (p.length == 2 && Map.class.isAssignableFrom(p[1])) {
-                return m.invoke(platform, agent, bindings);
-            }
-        }
-        throw new NoSuchMethodException("No compatible AgentPlatform.runAgentFrom overload found");
-    }
-
-    private static Object resolveDefaultProcessOptions() throws Exception {
-        Class<?> opts = Class.forName("com.embabel.agent.core.ProcessOptions");
-        // Try DEFAULT constant first (Kotlin companion object or static field)
+    private static ProcessOptions defaultProcessOptions() {
         try {
-            return opts.getField("DEFAULT").get(null);
-        } catch (NoSuchFieldException ignored) { /* try companion */ }
+            Field f = ProcessOptions.class.getField("DEFAULT");
+            Object v = f.get(null);
+            if (v instanceof ProcessOptions po) return po;
+        } catch (NoSuchFieldException | IllegalAccessException ignored) { /* try companion */ }
         try {
-            Object companion = opts.getField("Companion").get(null);
-            return companion.getClass().getMethod("getDEFAULT").invoke(companion);
-        } catch (NoSuchFieldException | NoSuchMethodException ignored) { /* try no-arg ctor */ }
-        // Last resort: public no-arg constructor
-        return opts.getDeclaredConstructor().newInstance();
+            Object companion = ProcessOptions.class.getField("Companion").get(null);
+            Object v = companion.getClass().getMethod("getDEFAULT").invoke(companion);
+            if (v instanceof ProcessOptions po) return po;
+        } catch (ReflectiveOperationException ignored) { /* try ctor */ }
+        try {
+            return ProcessOptions.class.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot obtain ProcessOptions default", e);
+        }
     }
 
     // ── Execution Path 2: Virtual-thread fan-out (fallback) ───────────────────
