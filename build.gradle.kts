@@ -37,14 +37,24 @@ dependencies {
     // Resolved from the Embabel Artifactory (see repositories {} above). These
     // jars are NOT on Maven Central. The Spring Boot 3.3+ ASM reader parses
     // their Kotlin-compiled bytecode correctly; Spring Boot 3.2 could not.
+    //
+    // Core starter + GOAP planner + AgentPlatform bean:
     implementation("com.embabel.agent:embabel-agent-starter:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
+    // Local LLM providers (Ollama, LM Studio):
     implementation("com.embabel.agent:embabel-agent-starter-ollama:0.3.5")
     implementation("com.embabel.agent:embabel-agent-starter-lmstudio:0.3.5")
-    implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
+    // Web MVC + observability:
     implementation("com.embabel.agent:embabel-agent-starter-webmvc:0.3.5")
     implementation("com.embabel.agent:embabel-agent-starter-observability:0.3.5")
+    // ─── Cloud LLM provider starters (optional) ─────────────────────────────
+    // These eagerly validate API keys at startup and crash if keys are empty.
+    // Our LlmService already handles Anthropic/OpenAI/OpenRouter routing via
+    // direct WebClient calls, so these starters are NOT required. Uncomment
+    // if you want Embabel's Ai interface to route cloud LLM calls natively:
+    //
+    // implementation("com.embabel.agent:embabel-agent-starter-anthropic:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-openai:0.3.5")
+    // implementation("com.embabel.agent:embabel-agent-starter-openai-custom:0.3.5")
 
     // JSON & Serialization
     implementation("com.fasterxml.jackson.core:jackson-databind")

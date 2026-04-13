@@ -14,12 +14,6 @@ spring:
       enabled: true
   flyway:
     enabled: false
-  # Exclude Embabel cloud-provider autoconfigs — no API keys in CI/test.
-  autoconfigure:
-    exclude:
-      - com.embabel.agent.config.models.anthropic.AnthropicModelsConfig
-      - com.embabel.agent.config.models.openai.OpenAiModelsConfig
-      - com.embabel.agent.config.models.openai.OpenAiCustomModelsConfig
 
 server:
   port: 0
