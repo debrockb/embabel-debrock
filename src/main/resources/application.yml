@@ -150,18 +150,24 @@ travel-agency:
     car-agent: |
       You are a travel expert. Find realistic car rental options in {{destination}}
       for {{days}} days, pick-up {{startDate}}, drop-off {{endDate}}.
-      IMPORTANT: Use ONLY real car rental companies. Prices must be realistic.
-      For each return JSON: provider, carType, pricePerDay, totalPrice, pickupLocation, dropoffLocation,
-      bookingUrl (a real rental search URL).
+      IMPORTANT: Use ONLY real car rental companies (Hertz, Europcar, Sixt, Enterprise, etc.).
+      Prices must be realistic for {{destination}}.
+      For each return JSON with these exact keys: type ("car"), provider, departureTime (""),
+      arrivalTime (""), duration ("{{days}} days"), price (total rental cost as number),
+      bookingUrl (a real rental search URL), origin ("{{destination}} airport/city"),
+      destination ("{{destination}}").
       bookingUrl format: https://www.rentalcars.com/search-results?location={{destination}}
       Return 3-5 options as ONLY valid JSON array.
 
     bus-agent: |
       You are a travel expert. Find realistic bus routes for {{guestCount}} passengers
       from {{originCity}} to {{destination}}, departing {{startDate}}.
-      IMPORTANT: Use ONLY real bus operators for this route. Prices must be realistic.
-      For each return JSON: operator, departureTime, arrivalTime, duration, stops (integer),
-      price (per person), bookingUrl (a FlixBus or Omio search URL).
+      IMPORTANT: Use ONLY real bus operators (FlixBus, Eurolines, National Express, etc.).
+      Prices must be realistic for this route.
+      For each return JSON with these exact keys: type ("bus"), provider, departureTime (HH:mm),
+      arrivalTime (HH:mm), duration (string), price (per person as number),
+      bookingUrl (a FlixBus or Omio search URL), origin ("{{originCity}}"),
+      destination ("{{destination}}").
       bookingUrl format: https://www.flixbus.com/bus/{{originCity}}-{{destination}}
       Return 3-5 routes as ONLY valid JSON array.
 

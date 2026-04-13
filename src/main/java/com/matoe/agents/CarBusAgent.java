@@ -20,9 +20,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Ground transport agent (car rental + bus) — searches Rentalcars.com, FlixBus, Rome2Rio
- * via browser-use, falls back to LLM-generated results when browser service is unavailable.
- * Results are tagged with source provenance ("browser" or "llm").
+ * Ground transport agent — handles car rental AND bus searches separately,
+ * using the appropriate prompt for each. Results from both are merged.
  */
 @Component
 public class CarBusAgent {
@@ -38,7 +37,10 @@ public class CarBusAgent {
     private final SearchTargetService searchTargetService;
 
     @Value("${travel-agency.prompts.car-agent}")
-    private String defaultPrompt;
+    private String carPrompt;
+
+    @Value("${travel-agency.prompts.bus-agent}")
+    private String busPrompt;
 
     @Value("${travel-agency.browser.car-sites:rentalcars.com,kayak.com/cars}")
     private String carSites;
@@ -57,29 +59,32 @@ public class CarBusAgent {
         this.dynamicPromptService = dynamicPromptService;
         this.costTracker = costTracker;
         this.searchTargetService = searchTargetService;
-        // Register YAML default (DB version will override if set by admin)
-        dynamicPromptService.registerDefault("car-agent", "");
     }
 
     @jakarta.annotation.PostConstruct
     void init() {
-        dynamicPromptService.registerDefault("car-agent", defaultPrompt);
+        dynamicPromptService.registerDefault("car-agent", carPrompt);
+        dynamicPromptService.registerDefault("bus-agent", busPrompt);
     }
 
     public List<TransportOption> searchGroundTransport(TravelRequest request) {
-        long days = ChronoUnit.DAYS.between(request.startDate(), request.endDate());
-        if (days <= 0) days = 1;
+        boolean wantCar = request.transportTypes().contains("car");
+        boolean wantBus = request.transportTypes().contains("bus");
         String model = request.extractorModel();
-
-        // Combine car and bus sites for browser search
-        String combinedSites = carSites + "," + busSites;
+        List<TransportOption> results = new ArrayList<>();
 
         // -- primary: real browser search --
         if (browserService.isAvailable()) {
             try {
+                long days = ChronoUnit.DAYS.between(request.startDate(), request.endDate());
+                if (days <= 0) days = 1;
+                String sites = "";
+                if (wantCar) sites += carSites;
+                if (wantBus) sites += (sites.isEmpty() ? "" : ",") + busSites;
+
                 List<Map<String, Object>> raw = browserService.browseForList(
-                    buildBrowserTask(request, days),
-                    searchTargetService.getSites("car-agent", combinedSites),
+                    buildBrowserTask(request, days, wantCar, wantBus),
+                    searchTargetService.getSites("car-agent", sites),
                     "a JSON array of ground transport objects each with: type ('car' or 'bus'), " +
                     "provider (string), departureTime (HH:mm), arrivalTime (HH:mm), " +
                     "duration (string), price (total trip, number), bookingUrl (string), " +
@@ -95,43 +100,63 @@ public class CarBusAgent {
             }
         }
 
-        // -- fallback: LLM-generated results (marked as source=llm) --
+        // -- fallback: LLM-generated results, using the correct prompt per type --
+        if (wantCar) {
+            results.addAll(searchViaLlm(request, model, "car-agent", "car"));
+        }
+        if (wantBus) {
+            results.addAll(searchViaLlm(request, model, "bus-agent", "bus"));
+        }
+        return results;
+    }
+
+    private List<TransportOption> searchViaLlm(TravelRequest request, String model,
+                                                String promptName, String transportType) {
         try {
-            String systemPrompt = dynamicPromptService.getPrompt("car-agent");
-            if (systemPrompt.isBlank()) systemPrompt = defaultPrompt;
+            String systemPrompt = dynamicPromptService.getPrompt(promptName);
+            if (systemPrompt.isBlank()) systemPrompt = "car-agent".equals(promptName) ? carPrompt : busPrompt;
             String userPrompt = promptTemplateService.buildCarBusPrompt(systemPrompt, request);
 
             long start = System.currentTimeMillis();
             String raw = llmService.call(model, "You are a travel search expert. Return ONLY valid JSON array.", userPrompt);
             long durationMs = System.currentTimeMillis() - start;
 
-            costTracker.logCall(request.sessionId(), "car-bus-agent", model != null ? model : "default",
+            costTracker.logCall(request.sessionId(), transportType + "-agent", model != null ? model : "default",
                 resolveProvider(model), estimateTokens(userPrompt), estimateTokens(raw), durationMs, true, null);
 
             List<Map<String, Object>> items = objectMapper.readValue(
                 llmService.extractJson(raw), new TypeReference<>() {});
             return items.stream().map(m -> map(m, "llm", request)).collect(Collectors.toList());
         } catch (Exception e) {
-            log.warn("CarBusAgent LLM fallback failed for {}: {}", request.destination(), e.getMessage());
-            costTracker.logCall(request.sessionId(), "car-bus-agent", request.extractorModel(),
+            log.warn("CarBusAgent {} LLM fallback failed for {}: {}", transportType, request.destination(), e.getMessage());
+            costTracker.logCall(request.sessionId(), transportType + "-agent", request.extractorModel(),
                 "unknown", 0, 0, 0, false, e.getMessage());
             return List.of();
         }
     }
 
-    private String buildBrowserTask(TravelRequest request, long days) {
+    private String buildBrowserTask(TravelRequest request, long days, boolean wantCar, boolean wantBus) {
+        String types = "";
+        if (wantCar && wantBus) types = "car rental and bus";
+        else if (wantCar) types = "car rental";
+        else types = "bus";
+
         return String.format(
-            "Search for 3-4 ground transport options (car rental and/or bus) " +
-            "to/from %s for %d people, %s to %s (%d days). Budget: approx. %.0f EUR max total. " +
-            "For each option get: type (car or bus), provider, departure time, arrival time, " +
-            "duration, total price, booking URL.",
-            request.destination(), request.guestCount(),
+            "Search for 3-4 %s options to/from %s for %d people, %s to %s (%d days). " +
+            "Budget: approx. %.0f EUR max total. For each option get: type (car or bus), " +
+            "provider, departure time, arrival time, duration, total price, booking URL.",
+            types, request.destination(), request.guestCount(),
             request.startDate(), request.endDate(), days, request.budgetMax()
         );
     }
 
     private TransportOption map(Map<String, Object> m, String source, TravelRequest request) {
+        // Accept multiple field names for price — car prompts use totalPrice/pricePerDay,
+        // bus prompts use price.
         double price = num(m, "price");
+        if (price <= 0) price = num(m, "totalPrice");
+        if (price <= 0) price = num(m, "pricePerDay"); // single day = total
+
         String tier = price < 100 ? "budget" : price > 400 ? "luxury" : "standard";
         String type = str(m, "type");
         if (!type.equals("car") && !type.equals("bus")) type = "car";

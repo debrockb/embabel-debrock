@@ -62,3 +62,9 @@ venv/
 
 # PDF export workdir
 /tmp_exports/
+
+# Local NAS deployment scripts (contain Portainer credentials)
+deploy-nas.sh
+fetch-logs.sh
+build-all.sh
+upload-browser.sh
