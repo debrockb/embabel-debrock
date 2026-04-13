@@ -30,12 +30,12 @@ server:
 
 embabel:
   models:
-    default-llm: qwen3.5:9b
+    default-llm: nemotron-3-nano:4b
     llms:
-      orchestrator: qwen3.5:9b
+      orchestrator: nemotron-3-nano:4b
       extractor: nemotron-3-nano:4b
       country-specialist: nemotron-3-nano:4b
-      best: qwen3.5:9b
+      best: nemotron-3-nano:4b
       cheapest: nemotron-3-nano:4b
   agent:
     platform:
@@ -53,7 +53,7 @@ spring.ai:
 
 travel-agency:
   models:
-    default-orchestrator: "lmstudio/qwen3.5:9b"
+    default-orchestrator: "lmstudio/nemotron-3-nano:4b"
     default-extractor: "lmstudio/nemotron-3-nano:4b"
     country-specialist: "lmstudio/nemotron-3-nano:4b"
 

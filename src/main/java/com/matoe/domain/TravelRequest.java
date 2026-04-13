@@ -60,7 +60,7 @@ public record TravelRequest(
 
         // Default to local LLMs so NAS installs work without cloud keys.
         if (orchestratorModel == null || orchestratorModel.isBlank())
-            orchestratorModel = "lmstudio/qwen3.5:9b";
+            orchestratorModel = "lmstudio/nemotron-3-nano:4b";
         if (extractorModel == null || extractorModel.isBlank())
             extractorModel = "lmstudio/nemotron-3-nano:4b";
     }

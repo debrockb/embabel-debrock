@@ -88,7 +88,7 @@ public class LlmService {
         if (modelString == null || modelString.isBlank()) {
             // Default to LM Studio for local-only NAS deployments.
             // Override via travel-agency.models.default-orchestrator / default-extractor.
-            modelString = "lmstudio/qwen3.5:9b";
+            modelString = "lmstudio/nemotron-3-nano:4b";
         }
 
         if (modelString.startsWith("anthropic/")) {

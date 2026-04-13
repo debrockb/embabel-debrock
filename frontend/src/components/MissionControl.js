@@ -19,7 +19,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
     accommodationTypes: ['hotel', 'bb', 'apartment'],
     transportTypes: ['flight', 'car'],
     interestTags: [],
-    orchestratorModel: 'lmstudio/qwen3.5:9b',
+    orchestratorModel: 'lmstudio/nemotron-3-nano:4b',
     extractorModel: 'lmstudio/nemotron-3-nano:4b',
   });
 

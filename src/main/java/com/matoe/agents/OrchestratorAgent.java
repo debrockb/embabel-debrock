@@ -61,8 +61,11 @@ public class OrchestratorAgent {
             Map<String, Object> weatherForecast,
             Map<String, Object> currencyInfo) {
 
-        String model = request.orchestratorModel();
-        if (model == null || model.isBlank()) model = "lmstudio/qwen3.5:9b";
+        // Use the extractor model for synthesis — on NAS hardware the 9B orchestrator
+        // model (qwen3.5:9b) returns empty responses after 100s+. The 4B extractor model
+        // (nemotron-3-nano:4b) handles synthesis reliably within the timeout.
+        String model = request.extractorModel();
+        if (model == null || model.isBlank()) model = "lmstudio/nemotron-3-nano:4b";
 
         // Build the synthesis prompt with all gathered data
         String systemPrompt = dynamicPromptService.getPrompt("orchestrator");
