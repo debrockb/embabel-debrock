@@ -35,6 +35,11 @@ public record TravelRequest(
         if (interestTags == null) interestTags = List.of();
         if (travelStyle == null) travelStyle = "standard";
         if (originCity == null) originCity = "";
+        // Default to local LLMs so NAS installs work without cloud keys.
+        if (orchestratorModel == null || orchestratorModel.isBlank())
+            orchestratorModel = "lmstudio/llama-3-8b";
+        if (extractorModel == null || extractorModel.isBlank())
+            extractorModel = "lmstudio/llama-3-8b";
     }
 
     public long nights() {

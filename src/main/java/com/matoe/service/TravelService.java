@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Method;
@@ -56,6 +57,15 @@ public class TravelService {
     private final ExecutorService agentExecutor;
     /** May be null if Embabel autoconfig is excluded in a given profile. */
     private final AgentPlatform agentPlatform;
+    /**
+     * The Embabel {@code Agent} wrapper for our {@code @Agent}-annotated
+     * {@link TravelPlannerAgent}. Embabel's component scanner creates an
+     * {@code Agent} bean that wraps the annotated class, scanning its
+     * {@code @Action} methods to build the GOAP action set. This is the
+     * object {@code AgentPlatform.runAgentFrom()} actually accepts — NOT the
+     * raw Spring POJO. Resolved from the ApplicationContext by type.
+     */
+    private final Object embabelAgentWrapper; // com.embabel.agent.core.Agent
 
     public TravelService(
             TravelPlannerAgent travelPlannerAgent,
@@ -64,7 +74,8 @@ public class TravelService {
             ItineraryRepository repository,
             ObjectMapper objectMapper,
             @Qualifier("agentExecutor") ExecutorService agentExecutor,
-            @Autowired(required = false) AgentPlatform agentPlatform) {
+            @Autowired(required = false) AgentPlatform agentPlatform,
+            ApplicationContext applicationContext) {
         this.travelPlannerAgent = travelPlannerAgent;
         this.progressService = progressService;
         this.costTracker = costTracker;
@@ -72,8 +83,50 @@ public class TravelService {
         this.objectMapper = objectMapper;
         this.agentExecutor = agentExecutor;
         this.agentPlatform = agentPlatform;
-        log.info("TravelService initialised — AgentPlatform={}, executor=virtual-threads",
-            agentPlatform != null ? "PRESENT (Embabel GOAP active)" : "absent (fallback mode)");
+        this.embabelAgentWrapper = resolveEmbabelAgent(applicationContext);
+        log.info("TravelService initialised — AgentPlatform={}, EmbabelAgent={}, executor=virtual-threads",
+            agentPlatform != null ? "PRESENT" : "absent",
+            embabelAgentWrapper != null ? embabelAgentWrapper.getClass().getSimpleName() : "absent");
+    }
+
+    /**
+     * Find the Embabel {@code Agent} wrapper bean for "TravelPlanner".
+     * Embabel creates beans of type {@code com.embabel.agent.core.Agent} for
+     * each {@code @Agent}-annotated class. We look up by type and match by
+     * name to find ours.
+     */
+    private static Object resolveEmbabelAgent(ApplicationContext ctx) {
+        try {
+            Class<?> agentType = Class.forName("com.embabel.agent.core.Agent");
+            Map<String, ?> agents = ctx.getBeansOfType(agentType);
+            if (agents.isEmpty()) {
+                log.info("No Embabel Agent beans found in context");
+                return null;
+            }
+            log.info("Embabel Agent beans found: {}", agents.keySet());
+            // Try to find by name attribute
+            for (Object agent : agents.values()) {
+                try {
+                    Method getName = agent.getClass().getMethod("getName");
+                    Object name = getName.invoke(agent);
+                    if ("TravelPlanner".equals(name)) {
+                        log.info("Resolved Embabel Agent wrapper: {}", agent.getClass().getName());
+                        return agent;
+                    }
+                } catch (NoSuchMethodException ignored) { /* try next */ }
+            }
+            // If name-based lookup fails, return the first one (likely single-agent app)
+            Object first = agents.values().iterator().next();
+            log.info("Using first Embabel Agent bean: {} ({})", agents.keySet().iterator().next(),
+                first.getClass().getName());
+            return first;
+        } catch (ClassNotFoundException e) {
+            log.info("Embabel Agent class not on classpath — GOAP path unavailable");
+            return null;
+        } catch (Exception e) {
+            log.warn("Failed to resolve Embabel Agent wrapper: {}", e.getMessage());
+            return null;
+        }
     }
 
     // ── public API ────────────────────────────────────────────────────────────
@@ -91,7 +144,7 @@ public class TravelService {
         }
 
         UnforgettableItinerary itinerary;
-        if (agentPlatform != null) {
+        if (agentPlatform != null && embabelAgentWrapper != null) {
             itinerary = runViaEmbabelGoap(enriched, sessionId);
         } else {
             itinerary = runViaVirtualThreads(enriched, sessionId);
@@ -123,15 +176,12 @@ public class TravelService {
             log.info("Running trip via Embabel AgentPlatform (GOAP planner)");
             Map<String, Object> bindings = Map.of("travelRequest", request);
 
-            // AgentPlatform.runAgentFrom(Agent, ProcessOptions, Map) — the first
-            // parameter expects Embabel's Agent interface.  TravelPlannerAgent is
-            // an @Agent-annotated POJO; Embabel discovers it via scanning but its
-            // runtime type doesn't implement Agent at the Java type level, so we
-            // call the method reflectively to let Embabel's internal routing handle
-            // the dispatch.
-            Object process = invokeRunAgentFrom(bindings);
+            // Dispatch through Embabel. We pass the resolved Agent wrapper bean
+            // (NOT our raw POJO) because AgentPlatform.runAgentFrom() expects
+            // com.embabel.agent.core.Agent.
+            Object process = invokeEmbabelRun(bindings);
             if (process == null) {
-                log.warn("Embabel runAgentFrom returned null — falling back");
+                log.warn("Embabel dispatch returned null — falling back");
                 return runViaVirtualThreads(request, sessionId);
             }
 
@@ -144,6 +194,7 @@ public class TravelService {
             Method resultMethod = process.getClass().getMethod("resultOfType", Class.class);
             Object result = resultMethod.invoke(process, UnforgettableItinerary.class);
             if (result instanceof UnforgettableItinerary it) {
+                log.info("Embabel GOAP plan completed — UnforgettableItinerary received");
                 return it;
             }
             log.warn("Embabel process produced no UnforgettableItinerary — falling back");
@@ -155,32 +206,69 @@ public class TravelService {
     }
 
     /**
-     * Reflectively call {@code AgentPlatform.runAgentFrom(...)}. Embabel 0.3.5
-     * overloads this method; we probe for the 3-arg form first (Agent,
-     * ProcessOptions, Map), then the 2-arg (Agent, Map). A reflective call
-     * avoids a compile-time dependency on Embabel's {@code Agent} interface
-     * which is implemented by Embabel's proxy layer, not by our POJO.
+     * Dispatch the trip via Embabel's AgentPlatform. Tries multiple API shapes
+     * because Embabel's Kotlin API exposes different overloads depending on the
+     * version and JVM-binary representation of Kotlin default params:
+     *
+     * <ol>
+     *   <li>{@code runAgentFrom(Agent, ProcessOptions, Map)} — 0.3.5 verified</li>
+     *   <li>{@code runAgentFrom(Agent, Map)} — legacy shape</li>
+     *   <li>{@code runAgent(String, Map)} — name-based dispatch (fallback)</li>
+     * </ol>
+     *
+     * Uses the resolved {@link #embabelAgentWrapper} (Embabel's {@code Agent}
+     * bean), NOT the Spring POJO.
      */
-    private Object invokeRunAgentFrom(Map<String, Object> bindings) throws Exception {
+    private Object invokeEmbabelRun(Map<String, Object> bindings) throws Exception {
         Method[] methods = agentPlatform.getClass().getMethods();
-        // 3-arg form: (Agent, ProcessOptions, Map)
+
+        // ── 1. runAgentFrom(Agent, ProcessOptions, Map) ──────────────────
         for (Method m : methods) {
             if (!"runAgentFrom".equals(m.getName())) continue;
             Class<?>[] p = m.getParameterTypes();
-            if (p.length == 3 && Map.class.isAssignableFrom(p[2])) {
+            if (p.length == 3 && Map.class.isAssignableFrom(p[2])
+                    && p[0].isInstance(embabelAgentWrapper)) {
                 Object opts = resolveDefaultProcessOptions(p[1]);
-                return m.invoke(agentPlatform, travelPlannerAgent, opts, bindings);
+                log.debug("Embabel dispatch: runAgentFrom(Agent, ProcessOptions, Map)");
+                return m.invoke(agentPlatform, embabelAgentWrapper, opts, bindings);
             }
         }
-        // 2-arg form: (Agent, Map)
+
+        // ── 2. runAgentFrom(Agent, Map) ──────────────────────────────────
         for (Method m : methods) {
             if (!"runAgentFrom".equals(m.getName())) continue;
             Class<?>[] p = m.getParameterTypes();
-            if (p.length == 2 && Map.class.isAssignableFrom(p[1])) {
-                return m.invoke(agentPlatform, travelPlannerAgent, bindings);
+            if (p.length == 2 && Map.class.isAssignableFrom(p[1])
+                    && p[0].isInstance(embabelAgentWrapper)) {
+                log.debug("Embabel dispatch: runAgentFrom(Agent, Map)");
+                return m.invoke(agentPlatform, embabelAgentWrapper, bindings);
             }
         }
-        throw new NoSuchMethodException("No compatible AgentPlatform.runAgentFrom overload");
+
+        // ── 3. runAgent(String, ProcessOptions, Map) — name-based ────────
+        for (Method m : methods) {
+            if (!"runAgent".equals(m.getName())) continue;
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length >= 2 && p[0] == String.class) {
+                if (p.length == 3 && Map.class.isAssignableFrom(p[2])) {
+                    Object opts = resolveDefaultProcessOptions(p[1]);
+                    log.debug("Embabel dispatch: runAgent(String, ProcessOptions, Map)");
+                    return m.invoke(agentPlatform, "TravelPlanner", opts, bindings);
+                }
+                if (p.length == 2 && Map.class.isAssignableFrom(p[1])) {
+                    log.debug("Embabel dispatch: runAgent(String, Map)");
+                    return m.invoke(agentPlatform, "TravelPlanner", bindings);
+                }
+            }
+        }
+
+        // Log available methods for debugging
+        List<String> available = Arrays.stream(methods)
+            .filter(m -> m.getName().startsWith("run"))
+            .map(m -> m.getName() + "(" + Arrays.toString(m.getParameterTypes()) + ")")
+            .toList();
+        log.warn("No compatible AgentPlatform.runAgent* method found. Available: {}", available);
+        throw new NoSuchMethodException("No compatible AgentPlatform dispatch method");
     }
 
     /** Resolve the default ProcessOptions instance from Embabel's Kotlin class. */
@@ -196,7 +284,7 @@ public class TravelService {
         // No-arg constructor
         try { return optsType.getDeclaredConstructor().newInstance(); }
         catch (ReflectiveOperationException ignored) {}
-        return null; // will pass null; Embabel may use its internal default
+        return null;
     }
 
     // ── Execution Path 2: Virtual-thread fan-out (fallback) ───────────────────

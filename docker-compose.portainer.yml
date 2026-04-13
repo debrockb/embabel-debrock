@@ -123,7 +123,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-lmstudio/llama-3-8b}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
@@ -147,7 +147,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-lmstudio/llama-3-8b}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
@@ -171,7 +171,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-anthropic/claude-3-5-sonnet-20241022}
+      DEFAULT_MODEL: ${BROWSER_DEFAULT_MODEL:-lmstudio/llama-3-8b}
       MAX_CONCURRENT: ${BROWSER_MAX_CONCURRENT:-1}
       BROWSER_HEADLESS: "true"
       LOG_LEVEL: INFO
