@@ -14,7 +14,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
     accommodationTypes: ['hotel', 'bb', 'apartment'],
     transportTypes: ['flight', 'car'],
     interestTags: [],
-    orchestratorModel: 'anthropic/claude-3-5-sonnet',
+    orchestratorModel: 'lmstudio/llama-3-8b',
     extractorModel: 'lmstudio/llama-3-8b',
   });
 

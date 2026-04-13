@@ -70,7 +70,9 @@ public class LlmService {
      */
     public String call(String modelString, String systemPrompt, String userPrompt) {
         if (modelString == null || modelString.isBlank()) {
-            modelString = "anthropic/" + defaultAnthropicModel;
+            // Default to LM Studio for local-only NAS deployments.
+            // Override via travel-agency.models.default-orchestrator / default-extractor.
+            modelString = "lmstudio/llama-3-8b";
         }
 
         if (modelString.startsWith("anthropic/")) {

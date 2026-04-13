@@ -62,8 +62,8 @@ spring.ai:
 # ─── Travel Agency Config ───────────────────────────────────────────────────
 travel-agency:
   models:
-    default-orchestrator: "anthropic/claude-3-5-sonnet"
-    default-extractor: "lmstudio/llama-3-8b"
+    default-orchestrator: ${MATOE_DEFAULT_ORCHESTRATOR:lmstudio/llama-3-8b}
+    default-extractor: ${MATOE_DEFAULT_EXTRACTOR:lmstudio/llama-3-8b}
     country-specialist: "lmstudio/llama-3-8b"
 
   prompts:
