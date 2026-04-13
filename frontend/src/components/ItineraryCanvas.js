@@ -68,7 +68,7 @@ function ItineraryCanvas({ itinerary }) {
       </div>
 
       {/* Destination Map */}
-      <DestinationMap destination={itinerary.destination} attractions={itinerary.attractions} />
+      <DestinationMap destination={itinerary.destination} attractions={itinerary.attractions} accommodations={itinerary.accommodations} />
 
       {/* Variants (Budget / Standard / Luxury) */}
       {hasVariants && (

@@ -153,7 +153,9 @@ public class AttractionsAgent {
             str(m, "bookingUrl"),
             tier,
             source,
-            toStringList(m.get("tags"))
+            toStringList(m.get("tags")),
+            num(m, "latitude"),
+            num(m, "longitude")
         );
     }
 

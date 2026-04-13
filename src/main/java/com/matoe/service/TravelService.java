@@ -420,7 +420,7 @@ public class TravelService {
                         : a.pricePerNight() <= luxuryLine ? "standard" : "luxury";
             return new AccommodationOption(a.id(), a.type(), a.name(), a.pricePerNight(),
                 a.totalPrice(), a.rating(), a.location(), a.amenities(), a.bookingUrl(),
-                tier, a.source(), a.imageUrl());
+                tier, a.source(), a.imageUrl(), a.latitude(), a.longitude());
         }).collect(Collectors.toList());
     }
 

@@ -83,25 +83,29 @@ travel-agency:
     hotel-agent: |
       Find hotels in {{destination}} for {{guestCount}} guests, {{startDate}} to {{endDate}} ({{nights}} nights).
       Budget: €{{budgetMin}}–€{{budgetMax}} total. Style: {{travelStyle}}.
-      For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     bb-agent: |
       Find bed-and-breakfasts and charming guesthouses in {{destination}} for {{guestCount}} guests,
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
-      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     apartment-agent: |
       Find holiday apartments and short-term rentals in {{destination}} suitable for {{guestCount}} guests,
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
-      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     hostel-agent: |
       Find hostels and budget accommodation in {{destination}} for {{guestCount}} guests,
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
-      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl.
+      For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
 
     flight-agent: |
@@ -136,7 +140,8 @@ travel-agency:
     attractions-agent: |
       Find top attractions and experiences in {{destination}} matching interests: {{interestTags}}.
       Trip duration: {{nights}} days. Budget: €{{budgetMin}}–€{{budgetMax}} total.
-      For each return: name, description, category, price, duration, rating, location, bookingUrl, tags (array).
+      For each return: name, description, category, price, duration, rating, location, bookingUrl, tags (array), latitude, longitude.
+      latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Return ONLY valid JSON array of 8-12 attractions.
 
     weather-agent: |

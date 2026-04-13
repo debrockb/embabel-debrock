@@ -131,7 +131,8 @@ public class ApartmentAgent {
         return new AccommodationOption(
             UUID.randomUUID().toString(), "apartment", str(m, "name"), ppn, tot,
             num(m, "rating"), str(m, "location"), toStringList(m.get("amenities")),
-            str(m, "bookingUrl"), tier, source, str(m, "imageUrl")
+            str(m, "bookingUrl"), tier, source, str(m, "imageUrl"),
+            num(m, "latitude"), num(m, "longitude")
         );
     }
 

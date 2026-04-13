@@ -15,13 +15,24 @@ public record AccommodationOption(
     @JsonProperty("bookingUrl") String bookingUrl,
     @JsonProperty("tier") String tier,               // "budget", "standard", "luxury"
     @JsonProperty("source") String source,           // "browser", "llm", "api"  — provenance tracking
-    @JsonProperty("imageUrl") String imageUrl
+    @JsonProperty("imageUrl") String imageUrl,
+    @JsonProperty("latitude") double latitude,
+    @JsonProperty("longitude") double longitude
 ) {
-    /** Backwards-compatible constructor. */
+    /** Backwards-compatible constructor (no coordinates). */
+    public AccommodationOption(String id, String type, String name, double pricePerNight,
+                               double totalPrice, double rating, String location,
+                               List<String> amenities, String bookingUrl, String tier,
+                               String source, String imageUrl) {
+        this(id, type, name, pricePerNight, totalPrice, rating, location,
+             amenities, bookingUrl, tier, source, imageUrl, 0.0, 0.0);
+    }
+
+    /** Backwards-compatible constructor (no source, imageUrl, or coordinates). */
     public AccommodationOption(String id, String type, String name, double pricePerNight,
                                double totalPrice, double rating, String location,
                                List<String> amenities, String bookingUrl, String tier) {
         this(id, type, name, pricePerNight, totalPrice, rating, location,
-             amenities, bookingUrl, tier, "llm", "");
+             amenities, bookingUrl, tier, "llm", "", 0.0, 0.0);
     }
 }

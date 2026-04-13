@@ -31,7 +31,7 @@ async function geocode(destination) {
   return null;
 }
 
-function DestinationMap({ destination, attractions }) {
+function DestinationMap({ destination, attractions, accommodations }) {
   const [coords, setCoords] = useState(null);
 
   useEffect(() => {
@@ -58,11 +58,20 @@ function DestinationMap({ destination, attractions }) {
           <Popup>{destination}</Popup>
         </Marker>
         {attractions && attractions.map((attr, i) => {
-          // If attractions have location coords, show them too
           if (attr.latitude && attr.longitude) {
             return (
-              <Marker key={i} position={[attr.latitude, attr.longitude]}>
-                <Popup>{attr.name}</Popup>
+              <Marker key={`attr-${i}`} position={[attr.latitude, attr.longitude]}>
+                <Popup><strong>{attr.name}</strong><br />{attr.category || 'Attraction'}</Popup>
+              </Marker>
+            );
+          }
+          return null;
+        })}
+        {accommodations && accommodations.map((acc, i) => {
+          if (acc.latitude && acc.longitude) {
+            return (
+              <Marker key={`acc-${i}`} position={[acc.latitude, acc.longitude]}>
+                <Popup><strong>{acc.name}</strong><br />{acc.type || 'Accommodation'} &mdash; &euro;{acc.pricePerNight}/night</Popup>
               </Marker>
             );
           }

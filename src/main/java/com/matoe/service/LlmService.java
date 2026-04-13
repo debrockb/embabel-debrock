@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -64,10 +65,14 @@ public class LlmService {
 
     /**
      * Call the appropriate LLM based on the model-string prefix.
+     * Results are cached in the {@code llm-responses} cache (Redis/in-memory)
+     * keyed by (modelString, systemPrompt, userPrompt) — identical calls
+     * within the TTL window (1 hour) return the cached response.
      *
      * @param modelString e.g. "anthropic/claude-3-5-sonnet", "lmstudio/llama-3-8b",
      *                    "ollama/mistral", "openrouter/openai/gpt-4o"
      */
+    @Cacheable(value = "llm-responses", unless = "#result == null")
     public String call(String modelString, String systemPrompt, String userPrompt) {
         if (modelString == null || modelString.isBlank()) {
             // Default to LM Studio for local-only NAS deployments.
