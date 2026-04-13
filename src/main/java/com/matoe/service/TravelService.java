@@ -10,6 +10,8 @@ import com.matoe.repository.ItineraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
@@ -174,6 +176,7 @@ public class TravelService {
 
     // ── public API ────────────────────────────────────────────────────────────
 
+    @CacheEvict(value = "itineraries", allEntries = true)
     public UnforgettableItinerary planTrip(TravelRequest request, String sessionId) {
         TravelRequest enriched = withSessionId(request, sessionId);
         boolean live = sessionId != null && !sessionId.isBlank();
@@ -438,16 +441,19 @@ public class TravelService {
 
     // ── Query API ─────────────────────────────────────────────────────────────
 
+    @Cacheable(value = "itineraries", key = "'all'")
     public List<UnforgettableItinerary> getAllItineraries() {
         return repository.findAllByOrderByCreatedAtDesc().stream()
             .map(this::toItinerary).collect(Collectors.toList());
     }
 
+    @Cacheable(value = "itineraries", key = "#destination")
     public List<UnforgettableItinerary> searchItineraries(String destination) {
         return repository.findByDestinationContainingIgnoreCaseOrderByCreatedAtDesc(destination)
             .stream().map(this::toItinerary).collect(Collectors.toList());
     }
 
+    @Cacheable(value = "itineraries", key = "#id")
     public UnforgettableItinerary getItinerary(String id) {
         return repository.findById(id).map(this::toItinerary).orElse(null);
     }

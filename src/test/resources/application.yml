@@ -12,6 +12,14 @@ spring:
   threads:
     virtual:
       enabled: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 100ms
+      connect-timeout: 100ms
+  cache:
+    type: simple
   flyway:
     enabled: false
 

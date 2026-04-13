@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './ItineraryCanvas.css';
+import DestinationMap from './DestinationMap';
 
 function ItineraryCanvas({ itinerary }) {
   const [expandedSection, setExpandedSection] = useState('variants');
@@ -65,6 +66,9 @@ function ItineraryCanvas({ itinerary }) {
           <h4>&euro;{itinerary.totalEstimatedCost.toFixed(0)}</h4>
         </div>
       </div>
+
+      {/* Destination Map */}
+      <DestinationMap destination={itinerary.destination} attractions={itinerary.attractions} />
 
       {/* Variants (Budget / Standard / Luxury) */}
       {hasVariants && (

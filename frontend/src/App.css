@@ -1,12 +1,58 @@
+/* ── Light theme (default) ─────────────────────────────────────────── */
+:root {
+  --bg-gradient-start: #667eea;
+  --bg-gradient-end: #764ba2;
+  --surface: #ffffff;
+  --surface-hover: #f8f9fa;
+  --text-primary: #1a1a2e;
+  --text-secondary: #555;
+  --text-muted: #888;
+  --border: #e0e0e0;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-heavy: rgba(0, 0, 0, 0.15);
+  --error-bg: #ffebee;
+  --error-border: #ef9a9a;
+  --error-text: #c62828;
+  --nav-bg: rgba(255, 255, 255, 0.15);
+  --nav-border: rgba(255, 255, 255, 0.3);
+  --nav-active-bg: white;
+  --nav-active-text: #667eea;
+  --header-text: white;
+}
+
+/* ── Dark theme ───────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-gradient-start: #1a1a2e;
+  --bg-gradient-end: #16213e;
+  --surface: #1e293b;
+  --surface-hover: #334155;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #334155;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-heavy: rgba(0, 0, 0, 0.5);
+  --error-bg: #450a0a;
+  --error-border: #991b1b;
+  --error-text: #fca5a5;
+  --nav-bg: rgba(255, 255, 255, 0.08);
+  --nav-border: rgba(255, 255, 255, 0.15);
+  --nav-active-bg: #334155;
+  --nav-active-text: #818cf8;
+  --header-text: #e2e8f0;
+}
+
 .app {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
   padding: 2rem;
+  color: var(--text-primary);
+  transition: background 0.3s ease;
 }
 
 .app-header {
   text-align: center;
-  color: white;
+  color: var(--header-text);
   margin-bottom: 3rem;
 }
 
@@ -30,9 +76,9 @@
 
 .app-nav button {
   padding: 0.5rem 1.5rem;
-  background: rgba(255,255,255,0.15);
-  color: white;
-  border: 1px solid rgba(255,255,255,0.3);
+  background: var(--nav-bg);
+  color: var(--header-text);
+  border: 1px solid var(--nav-border);
   border-radius: 6px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -41,12 +87,28 @@
 }
 
 .app-nav button.active {
-  background: white;
-  color: #667eea;
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
 }
 
 .app-nav button:hover:not(.active) {
-  background: rgba(255,255,255,0.25);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.theme-toggle {
+  padding: 0.4rem 0.9rem;
+  background: var(--nav-bg);
+  color: var(--header-text);
+  border: 1px solid var(--nav-border);
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .app-main {
@@ -63,18 +125,20 @@
 
 .control-panel,
 .tracker-panel {
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
   padding: 2rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px var(--shadow);
+  color: var(--text-primary);
 }
 
 .itinerary-panel,
 .admin-panel {
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
   padding: 2rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px var(--shadow);
+  color: var(--text-primary);
 }
 
 @media (max-width: 1024px) {
@@ -84,9 +148,9 @@
 }
 
 .error-banner {
-  background: #ffebee;
-  border: 1px solid #ef9a9a;
-  color: #c62828;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-text);
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
@@ -98,8 +162,8 @@
 .error-banner button {
   margin-left: auto;
   background: none;
-  border: 1px solid #c62828;
-  color: #c62828;
+  border: 1px solid var(--error-text);
+  color: var(--error-text);
   padding: 0.2rem 0.6rem;
   border-radius: 4px;
   cursor: pointer;
@@ -107,8 +171,8 @@
 }
 
 .error-banner button:hover {
-  background: #c62828;
-  color: white;
+  background: var(--error-text);
+  color: var(--surface);
 }
 
 @media (max-width: 768px) {

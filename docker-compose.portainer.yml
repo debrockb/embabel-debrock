@@ -73,6 +73,7 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       BROWSER_SERVICE_URL: http://matoe-browser-lb:80
       BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-true}
+      REDIS_HOST: matoe-redis
       # Admin token is required in production — backend will refuse to start if unset.
       MATOE_ADMIN_TOKEN: ${MATOE_ADMIN_TOKEN:?MATOE_ADMIN_TOKEN must be set in Portainer Stack env}
       # Default CORS locked to the internal frontend origin only.

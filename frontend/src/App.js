@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import './App.css';
 import MissionControl from './components/MissionControl';
 import LiveAgentTracker from './components/LiveAgentTracker';
@@ -28,7 +28,13 @@ function App() {
   const [isLoading, setIsLoading]   = useState(false);
   const [error, setError]           = useState(null);
   const [activeView, setActiveView] = useState('planner');  // 'planner' | 'admin'
+  const [darkMode, setDarkMode]     = useState(() => localStorage.getItem('matoe-theme') === 'dark');
   const eventSourceRef              = useRef(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('matoe-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const updateAgent = useCallback((name, status, progress) => {
     setAgents(prev => prev.map(a =>
@@ -109,6 +115,11 @@ function App() {
             className={activeView === 'admin' ? 'active' : ''}
             onClick={() => setActiveView('admin')}
           >Admin</button>
+          <button
+            className="theme-toggle"
+            onClick={() => setDarkMode(d => !d)}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >{darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19'}</button>
         </nav>
       </header>
 

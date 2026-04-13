@@ -74,6 +74,9 @@ dependencies {
     // HTTP Client (WebFlux/WebClient for browser-service + LLM calls)
     implementation("org.springframework.boot:spring-boot-starter-webflux")
 
+    // Redis (session cache, LLM response cache, rate limiting)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
     // Resilience4j — circuit breakers for browser/LLM services
     implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
     implementation("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
