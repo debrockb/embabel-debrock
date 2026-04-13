@@ -70,6 +70,44 @@
   cursor: pointer;
 }
 
+.children-ages {
+  margin-top: 0.75rem;
+}
+
+.children-ages > label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.4rem;
+}
+
+.ages-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+}
+
+.age-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.age-input label {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.age-input input {
+  width: 52px;
+  text-align: center;
+  padding: 0.3rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
 .submit-btn {
   padding: 1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

@@ -8,7 +8,10 @@ function MissionControl({ onPlanTrip, isLoading }) {
     originCity: '',
     startDate: '',
     endDate: '',
-    guestCount: 1,
+    adults: 2,
+    children: 0,
+    childrenAges: [],
+    rooms: 1,
     budgetMin: 1000,
     budgetMax: 5000,
     travelStyle: 'standard',
@@ -38,14 +41,35 @@ function MissionControl({ onPlanTrip, isLoading }) {
     }
   };
 
+  const handleChildrenChange = (e) => {
+    const count = Math.max(0, Math.min(10, parseInt(e.target.value) || 0));
+    setFormData((prev) => {
+      const ages = [...prev.childrenAges];
+      // Grow or shrink the ages array to match the new count
+      while (ages.length < count) ages.push(5);
+      while (ages.length > count) ages.pop();
+      return { ...prev, children: count, childrenAges: ages };
+    });
+  };
+
+  const handleChildAgeChange = (index, value) => {
+    setFormData((prev) => {
+      const ages = [...prev.childrenAges];
+      ages[index] = Math.max(0, Math.min(17, parseInt(value) || 0));
+      return { ...prev, childrenAges: ages };
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onPlanTrip(formData);
+    // Compute guestCount for backwards compat
+    const guestCount = (parseInt(formData.adults) || 1) + (parseInt(formData.children) || 0);
+    onPlanTrip({ ...formData, guestCount });
   };
 
   return (
     <div className="mission-control">
-      <h2>🎯 Mission Control Dashboard</h2>
+      <h2>Plan Your Trip</h2>
 
       <form onSubmit={handleSubmit} className="control-form">
         <div className="form-row">
@@ -56,9 +80,10 @@ function MissionControl({ onPlanTrip, isLoading }) {
               name="destination"
               value={formData.destination}
               onChange={handleInputChange}
-              placeholder="e.g., Tokyo, Paris, New York"
+              placeholder="e.g., Tokyo, Tuscany, the Greek Islands"
               required
             />
+            <span className="field-hint">City, region, country, or area</span>
           </div>
           <div className="form-group">
             <label>Origin City</label>
@@ -96,18 +121,67 @@ function MissionControl({ onPlanTrip, isLoading }) {
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Guest Count</label>
-            <input
-              type="number"
-              name="guestCount"
-              value={formData.guestCount}
-              onChange={handleInputChange}
-              min="1"
-              max="20"
-            />
+        {/* ── Travellers & Rooms ────────────────────────────────────────── */}
+        <div className="form-group">
+          <label className="section-label">Travellers & Rooms</label>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Adults (18+)</label>
+              <input
+                type="number"
+                name="adults"
+                value={formData.adults}
+                onChange={handleInputChange}
+                min="1"
+                max="20"
+              />
+            </div>
+            <div className="form-group">
+              <label>Children (0-17)</label>
+              <input
+                type="number"
+                value={formData.children}
+                onChange={handleChildrenChange}
+                min="0"
+                max="10"
+              />
+            </div>
+            <div className="form-group">
+              <label>Rooms</label>
+              <input
+                type="number"
+                name="rooms"
+                value={formData.rooms}
+                onChange={handleInputChange}
+                min="1"
+                max="10"
+              />
+            </div>
           </div>
+
+          {formData.children > 0 && (
+            <div className="children-ages">
+              <label>Children's Ages</label>
+              <div className="ages-row">
+                {formData.childrenAges.map((age, i) => (
+                  <div key={i} className="age-input">
+                    <label>Child {i + 1}</label>
+                    <input
+                      type="number"
+                      value={age}
+                      onChange={(e) => handleChildAgeChange(i, e.target.value)}
+                      min="0"
+                      max="17"
+                    />
+                  </div>
+                ))}
+              </div>
+              <span className="field-hint">Ages affect pricing — children under 2 often fly free</span>
+            </div>
+          )}
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
             <label>Travel Style</label>
             <select
@@ -124,7 +198,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Budget Min (USD)</label>
+            <label>Budget Min (EUR)</label>
             <input
               type="number"
               name="budgetMin"
@@ -134,7 +208,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
             />
           </div>
           <div className="form-group">
-            <label>Budget Max (USD)</label>
+            <label>Budget Max (EUR)</label>
             <input
               type="number"
               name="budgetMax"
@@ -148,109 +222,48 @@ function MissionControl({ onPlanTrip, isLoading }) {
         <div className="form-group">
           <label>Accommodations</label>
           <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                name="accommodationTypes_"
-                value="hotel"
-                checked={formData.accommodationTypes.includes('hotel')}
-                onChange={handleInputChange}
-              />
-              Hotels
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="accommodationTypes_"
-                value="bb"
-                checked={formData.accommodationTypes.includes('bb')}
-                onChange={handleInputChange}
-              />
-              B&Bs
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="accommodationTypes_"
-                value="apartment"
-                checked={formData.accommodationTypes.includes('apartment')}
-                onChange={handleInputChange}
-              />
-              Apartments
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="accommodationTypes_"
-                value="hostel"
-                checked={formData.accommodationTypes.includes('hostel')}
-                onChange={handleInputChange}
-              />
-              Hostels
-            </label>
+            {[
+              ['hotel', 'Hotels'], ['bb', 'B&Bs'], ['apartment', 'Apartments'], ['hostel', 'Hostels'],
+            ].map(([val, label]) => (
+              <label key={val}>
+                <input
+                  type="checkbox"
+                  name="accommodationTypes_"
+                  value={val}
+                  checked={formData.accommodationTypes.includes(val)}
+                  onChange={handleInputChange}
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
 
         <div className="form-group">
           <label>Transport</label>
           <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                name="transportTypes_"
-                value="flight"
-                checked={formData.transportTypes.includes('flight')}
-                onChange={handleInputChange}
-              />
-              Flights
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="transportTypes_"
-                value="car"
-                checked={formData.transportTypes.includes('car')}
-                onChange={handleInputChange}
-              />
-              Car Rental
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="transportTypes_"
-                value="bus"
-                checked={formData.transportTypes.includes('bus')}
-                onChange={handleInputChange}
-              />
-              Bus
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="transportTypes_"
-                value="train"
-                checked={formData.transportTypes.includes('train')}
-                onChange={handleInputChange}
-              />
-              Train
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                name="transportTypes_"
-                value="ferry"
-                checked={formData.transportTypes.includes('ferry')}
-                onChange={handleInputChange}
-              />
-              Ferry
-            </label>
+            {[
+              ['flight', 'Flights'], ['car', 'Car Rental'], ['bus', 'Bus'],
+              ['train', 'Train'], ['ferry', 'Ferry'],
+            ].map(([val, label]) => (
+              <label key={val}>
+                <input
+                  type="checkbox"
+                  name="transportTypes_"
+                  value={val}
+                  checked={formData.transportTypes.includes(val)}
+                  onChange={handleInputChange}
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
 
         <div className="form-group">
           <label>Interests</label>
           <div className="checkbox-group">
-            {['food', 'history', 'nature', 'nightlife', 'art', 'adventure', 'shopping', 'relaxation'].map((tag) => (
+            {['food', 'history', 'nature', 'nightlife', 'art', 'adventure', 'shopping', 'relaxation', 'family', 'romance'].map((tag) => (
               <label key={tag}>
                 <input
                   type="checkbox"

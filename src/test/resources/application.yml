@@ -59,11 +59,11 @@ travel-agency:
 
   prompts:
     orchestrator: "Test orchestrator prompt"
-    hotel-agent: "Find hotels in {{destination}} for {{guestCount}} guests, {{nights}} nights."
-    bb-agent: "Find B&Bs in {{destination}} for {{guestCount}} guests."
-    apartment-agent: "Find apartments in {{destination}} for {{guestCount}} guests."
-    hostel-agent: "Find hostels in {{destination}}."
-    flight-agent: "Find flights from {{originCity}} to {{destination}} for {{guestCount}} passengers."
+    hotel-agent: "Find hotels in {{destination}} for {{adults}} adults, {{children}} children, {{rooms}} rooms, {{nights}} nights."
+    bb-agent: "Find B&Bs in {{destination}} for {{adults}} adults, {{children}} children, {{rooms}} rooms."
+    apartment-agent: "Find apartments in {{destination}} for {{adults}} adults, {{children}} children."
+    hostel-agent: "Find hostels in {{destination}} for {{adults}} adults, {{children}} children."
+    flight-agent: "Find flights from {{originCity}} to {{destination}} for {{adults}} adults, {{children}} children."
     train-agent: "Find trains."
     car-agent: "Find car rentals."
     bus-agent: "Find bus routes."

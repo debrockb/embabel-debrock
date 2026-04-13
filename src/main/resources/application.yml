@@ -81,38 +81,44 @@ travel-agency:
       Return a JSON object with the three variants and overall trip summary.
 
     hotel-agent: |
-      Find hotels in {{destination}} for {{guestCount}} guests, {{startDate}} to {{endDate}} ({{nights}} nights).
+      Find hotels in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
+      {{rooms}} room(s), {{startDate}} to {{endDate}} ({{nights}} nights).
       Budget: €{{budgetMin}}–€{{budgetMax}} total. Style: {{travelStyle}}.
       For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      pricePerNight is per room. totalPrice = pricePerNight × {{nights}} × {{rooms}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
-      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+      Return ONLY valid JSON array.
 
     bb-agent: |
-      Find bed-and-breakfasts and charming guesthouses in {{destination}} for {{guestCount}} guests,
-      {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      Find bed-and-breakfasts and charming guesthouses in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
+      {{rooms}} room(s), {{startDate}} to {{endDate}} ({{nights}} nights).
+      Budget: €{{budgetMin}}–€{{budgetMax}} total.
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      pricePerNight is per room. totalPrice = pricePerNight × {{nights}} × {{rooms}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
-      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+      Return ONLY valid JSON array.
 
     apartment-agent: |
-      Find holiday apartments and short-term rentals in {{destination}} suitable for {{guestCount}} guests,
+      Find holiday apartments and short-term rentals in {{destination}} suitable for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      pricePerNight is for the whole unit. totalPrice = pricePerNight × {{nights}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
-      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+      Return ONLY valid JSON array.
 
     hostel-agent: |
-      Find hostels and budget accommodation in {{destination}} for {{guestCount}} guests,
+      Find hostels and budget accommodation in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
+      pricePerNight is per bed. totalPrice = pricePerNight × {{nights}} × {{guestCount}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
-      Ensure totalPrice = pricePerNight × {{nights}}. Return ONLY valid JSON array.
+      Return ONLY valid JSON array.
 
     flight-agent: |
-      Find flights for {{guestCount}} passengers from {{originCity}} to {{destination}},
+      Find flights for {{adults}} adults and {{children}} children (ages: {{childrenAges}}) from {{originCity}} to {{destination}},
       departing {{startDate}} returning {{endDate}}.
       For each return: airline, departureTime, arrivalTime, duration, stops (integer), price (per person), bookingUrl.
-      Price is per person. Return ONLY valid JSON array.
+      Note: children under 2 may fly free or at reduced cost. Price is per person (adult rate). Return ONLY valid JSON array.
 
     train-agent: |
       Find train routes for {{guestCount}} passengers from {{originCity}} to {{destination}},

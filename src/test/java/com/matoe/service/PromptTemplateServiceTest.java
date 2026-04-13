@@ -28,7 +28,7 @@ class PromptTemplateServiceTest {
             List.of("Paris"),
             LocalDate.of(2024, 6, 1),
             LocalDate.of(2024, 6, 10),
-            2,
+            0, 2, 0, null, 1,
             2000.0,
             5000.0,
             "standard",
@@ -206,7 +206,8 @@ class PromptTemplateServiceTest {
         TravelRequest oneNight = new TravelRequest(
             "Berlin", null,
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 2),
-            1, 100.0, 300.0, null, null, null, null,
+            1, 0, 0, null, 0,
+            100.0, 300.0, null, null, null, null,
             null, null, null, null
         );
         String template = "Stay for {{nights}} nights in {{destination}}.";
@@ -220,7 +221,8 @@ class PromptTemplateServiceTest {
         TravelRequest sameDay = new TravelRequest(
             "Munich", null,
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 1),
-            1, 50.0, 200.0, null, null, null, null,
+            1, 0, 0, null, 0,
+            50.0, 200.0, null, null, null, null,
             null, null, null, null
         );
         String template = "Stay for {{nights}} nights.";

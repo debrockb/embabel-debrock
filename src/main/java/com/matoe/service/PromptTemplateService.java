@@ -161,6 +161,10 @@ public class PromptTemplateService {
         vars.put("startDate", request.startDate().toString());
         vars.put("endDate", request.endDate().toString());
         vars.put("guestCount", String.valueOf(request.guestCount()));
+        vars.put("adults", String.valueOf(request.adults()));
+        vars.put("children", String.valueOf(request.children()));
+        vars.put("childrenAges", request.childrenAgesText());
+        vars.put("rooms", String.valueOf(request.rooms()));
         vars.put("budgetMin", String.format("%.2f", request.budgetMin()));
         vars.put("budgetMax", String.format("%.2f", request.budgetMax()));
         vars.put("travelStyle", request.travelStyle());

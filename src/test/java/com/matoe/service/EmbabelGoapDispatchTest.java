@@ -71,7 +71,7 @@ class EmbabelGoapDispatchTest {
         testRequest = new TravelRequest(
             "Barcelona", List.of("Barcelona"),
             LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15),
-            2, 800.0, 3000.0, "standard",
+            0, 2, 0, null, 1, 800.0, 3000.0, "standard",
             List.of("hotel"), List.of("flight"), List.of("food", "art"),
             "lmstudio/llama-3-8b", "lmstudio/llama-3-8b",
             "Amsterdam", "goap-test-session"

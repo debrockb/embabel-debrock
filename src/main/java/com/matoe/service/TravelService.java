@@ -393,7 +393,8 @@ public class TravelService {
     private TravelRequest withSessionId(TravelRequest r, String sessionId) {
         return new TravelRequest(
             r.destination(), r.destinations(), r.startDate(), r.endDate(),
-            r.guestCount(), r.budgetMin(), r.budgetMax(), r.travelStyle(),
+            r.guestCount(), r.adults(), r.children(), r.childrenAges(), r.rooms(),
+            r.budgetMin(), r.budgetMax(), r.travelStyle(),
             r.accommodationTypes(), r.transportTypes(), r.interestTags(),
             r.orchestratorModel(), r.extractorModel(), r.originCity(),
             sessionId

@@ -40,6 +40,27 @@ from browser_use.browser.browser import Browser, BrowserConfig
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
+
+class OllamaCompatibleChatOpenAI(ChatOpenAI):
+    """
+    Wrapper that normalises ``tool_choice`` for Ollama's OpenAI-compatible
+    endpoint.  Ollama only accepts string values ("auto", "none", "required")
+    but browser-use sends an object like ``{"type": "function", ...}``.
+    """
+
+    def bind(self, **kwargs):
+        tc = kwargs.get("tool_choice")
+        if isinstance(tc, dict):
+            # Map object-style tool_choice to a string Ollama accepts.
+            kwargs["tool_choice"] = "auto"
+        return super().bind(**kwargs)
+
+    def bind_tools(self, tools, *, tool_choice=None, **kwargs):
+        if isinstance(tool_choice, dict):
+            tool_choice = "auto"
+        return super().bind_tools(tools, tool_choice=tool_choice, **kwargs)
+
+
 # ── config ────────────────────────────────────────────────────────────────────
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=LOG_LEVEL)
@@ -152,7 +173,7 @@ def build_llm(model_string: Optional[str]):
     # langchain_openai's ChatOpenAI requires a non-empty string.
     if model_string.startswith("lmstudio/"):
         model_name = model_string.split("/", 1)[1]
-        return ChatOpenAI(
+        return OllamaCompatibleChatOpenAI(
             model=model_name,
             api_key="lm-studio",
             base_url=LMSTUDIO_BASE_URL,
@@ -165,7 +186,7 @@ def build_llm(model_string: Optional[str]):
         base = OLLAMA_BASE_URL.rstrip("/")
         if not base.endswith("/v1"):
             base = base + "/v1"
-        return ChatOpenAI(
+        return OllamaCompatibleChatOpenAI(
             model=model_name,
             api_key="ollama",
             base_url=base,
@@ -276,7 +297,7 @@ async def browse(req: BrowseRequest):
                     success=True,
                     result=parsed,
                     raw_text=raw_text,
-                    steps_taken=len(result_obj.history()) if result_obj else 0,
+                    steps_taken=len(result_obj.history) if result_obj else 0,
                     duration_seconds=round(duration, 2),
                 )
             finally:

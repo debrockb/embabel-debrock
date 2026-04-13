@@ -59,7 +59,7 @@ class TravelServiceDispatchTest {
         testRequest = new TravelRequest(
             "Paris", List.of("Paris"),
             LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 5),
-            2, 500.0, 2000.0, "standard",
+            0, 2, 0, null, 1, 500.0, 2000.0, "standard",
             List.of("hotel"), List.of("flight"), List.of("food", "history"),
             "lmstudio/llama-3-8b", "lmstudio/llama-3-8b",
             "Amsterdam", "test-session"

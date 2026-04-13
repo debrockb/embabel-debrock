@@ -34,7 +34,7 @@ class DomainModelTest {
             List.of("Paris", "Lyon"),
             LocalDate.of(2024, 6, 1),
             LocalDate.of(2024, 6, 10),
-            2,
+            0, 2, 1, List.of(7), 1,
             2000.0,
             5000.0,
             "standard",
@@ -54,7 +54,11 @@ class DomainModelTest {
         assertEquals(List.of("Paris", "Lyon"), deserialized.destinations());
         assertEquals(LocalDate.of(2024, 6, 1), deserialized.startDate());
         assertEquals(LocalDate.of(2024, 6, 10), deserialized.endDate());
-        assertEquals(2, deserialized.guestCount());
+        assertEquals(3, deserialized.guestCount());   // 2 adults + 1 child
+        assertEquals(2, deserialized.adults());
+        assertEquals(1, deserialized.children());
+        assertEquals(List.of(7), deserialized.childrenAges());
+        assertEquals(1, deserialized.rooms());
         assertEquals(2000.0, deserialized.budgetMin());
         assertEquals(5000.0, deserialized.budgetMax());
         assertEquals("standard", deserialized.travelStyle());
@@ -72,7 +76,8 @@ class DomainModelTest {
         TravelRequest req = new TravelRequest(
             "Paris", null,
             LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 10),
-            2, 2000.0, 5000.0, null, null, null, null,
+            2, 0, 0, null, 0,
+            2000.0, 5000.0, null, null, null, null,
             null, null, null, null
         );
         assertEquals(9, req.nights());
@@ -83,7 +88,8 @@ class DomainModelTest {
         TravelRequest req = new TravelRequest(
             "Berlin", null,
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 5),
-            1, 500.0, 1500.0, null, null, null, null,
+            1, 0, 0, null, 0,
+            500.0, 1500.0, null, null, null, null,
             null, null, null, null
         );
         // Compact constructor should fill in defaults

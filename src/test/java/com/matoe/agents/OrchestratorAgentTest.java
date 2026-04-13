@@ -43,7 +43,7 @@ class OrchestratorAgentTest {
             List.of("Paris"),
             LocalDate.of(2024, 6, 1),
             LocalDate.of(2024, 6, 4),   // 3 nights
-            2,
+            0, 2, 0, null, 1,
             1000.0,
             3000.0,
             "standard",
