@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getModelsForRole, groupByProvider } from '../modelConfig';
 import './MissionControl.css';
 
 function MissionControl({ onPlanTrip, isLoading }) {
@@ -14,8 +15,8 @@ function MissionControl({ onPlanTrip, isLoading }) {
     accommodationTypes: ['hotel', 'bb', 'apartment'],
     transportTypes: ['flight', 'car'],
     interestTags: [],
-    orchestratorModel: 'lmstudio/llama-3-8b',
-    extractorModel: 'lmstudio/llama-3-8b',
+    orchestratorModel: 'lmstudio/qwen3.5:9b',
+    extractorModel: 'lmstudio/nemotron-3-nano:4b',
   });
 
   const handleInputChange = (e) => {
@@ -270,60 +271,23 @@ function MissionControl({ onPlanTrip, isLoading }) {
           <div className="form-row">
             <div className="form-group">
               <label>Orchestrator Model</label>
-              <select
+              <ModelSelect
                 name="orchestratorModel"
                 value={formData.orchestratorModel}
                 onChange={handleInputChange}
-              >
-                <optgroup label="Anthropic">
-                  <option value="anthropic/claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
-                  <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6 (balanced)</option>
-                  <option value="anthropic/claude-haiku-4-5">Claude Haiku 4.5 (fast)</option>
-                  <option value="anthropic/claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                </optgroup>
-                <optgroup label="OpenRouter">
-                  <option value="openrouter/openai/gpt-4o">GPT-4o (via OpenRouter)</option>
-                  <option value="openrouter/google/gemini-pro-1.5">Gemini Pro 1.5 (via OpenRouter)</option>
-                  <option value="openrouter/meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B (via OpenRouter)</option>
-                </optgroup>
-                <optgroup label="Local (LM Studio)">
-                  <option value="lmstudio/llama-3-8b">Llama 3 8B (LM Studio)</option>
-                  <option value="lmstudio/mistral-7b">Mistral 7B (LM Studio)</option>
-                  <option value="lmstudio/phi-3-mini">Phi-3 Mini (LM Studio)</option>
-                </optgroup>
-                <optgroup label="Local (Ollama)">
-                  <option value="ollama/llama3">Llama 3 (Ollama)</option>
-                  <option value="ollama/mistral">Mistral (Ollama)</option>
-                  <option value="ollama/gemma2">Gemma 2 (Ollama)</option>
-                </optgroup>
-              </select>
+                role="orchestrator"
+              />
               <span className="field-hint">Used for synthesis and high-reasoning tasks</span>
             </div>
 
             <div className="form-group">
               <label>Extractor Model</label>
-              <select
+              <ModelSelect
                 name="extractorModel"
                 value={formData.extractorModel}
                 onChange={handleInputChange}
-              >
-                <optgroup label="Local (LM Studio) — Recommended">
-                  <option value="lmstudio/llama-3-8b">Llama 3 8B (LM Studio)</option>
-                  <option value="lmstudio/mistral-7b">Mistral 7B (LM Studio)</option>
-                  <option value="lmstudio/phi-3-mini">Phi-3 Mini (LM Studio)</option>
-                </optgroup>
-                <optgroup label="Local (Ollama)">
-                  <option value="ollama/llama3">Llama 3 (Ollama)</option>
-                  <option value="ollama/mistral">Mistral (Ollama)</option>
-                </optgroup>
-                <optgroup label="Anthropic">
-                  <option value="anthropic/claude-haiku-4-5">Claude Haiku 4.5 (fast + cheap)</option>
-                  <option value="anthropic/claude-sonnet-4-6">Claude Sonnet 4.6</option>
-                </optgroup>
-                <optgroup label="OpenRouter">
-                  <option value="openrouter/meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B (via OpenRouter)</option>
-                </optgroup>
-              </select>
+                role="extractor"
+              />
               <span className="field-hint">Used for data extraction — local models save cost</span>
             </div>
           </div>
@@ -334,6 +298,25 @@ function MissionControl({ onPlanTrip, isLoading }) {
         </button>
       </form>
     </div>
+  );
+}
+
+/** Dynamic model dropdown — reads from localStorage-backed modelConfig. */
+function ModelSelect({ name, value, onChange, role }) {
+  const models = getModelsForRole(role);
+  const grouped = groupByProvider(models);
+  return (
+    <select name={name} value={value} onChange={onChange}>
+      {Object.entries(grouped).map(([provider, items]) => (
+        <optgroup key={provider} label={provider}>
+          {items.map((m) => (
+            <option key={m.modelId} value={m.modelId}>
+              {m.displayName}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   );
 }
 

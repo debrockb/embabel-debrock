@@ -264,3 +264,61 @@ h4 {
   color: #555;
   margin: 1.5rem 0 0.75rem;
 }
+
+/* ── Models tab ──────────────────────────────────────────────────────────── */
+
+.model-actions-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.model-form {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.model-form .form-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.model-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+  flex: 1;
+  min-width: 160px;
+}
+
+.model-form input[type="text"],
+.model-form input:not([type]) {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.model-form .role-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0;
+  white-space: nowrap;
+}
+
+.admin-table code {
+  font-size: 0.8rem;
+  background: #f0f0f0;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}

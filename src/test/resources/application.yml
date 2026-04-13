@@ -30,13 +30,13 @@ server:
 
 embabel:
   models:
-    default-llm: llama-3-8b
+    default-llm: qwen3.5:9b
     llms:
-      orchestrator: llama-3-8b
-      extractor: llama-3-8b
-      country-specialist: llama-3-8b
-      best: llama-3-8b
-      cheapest: llama-3-8b
+      orchestrator: qwen3.5:9b
+      extractor: nemotron-3-nano:4b
+      country-specialist: nemotron-3-nano:4b
+      best: qwen3.5:9b
+      cheapest: nemotron-3-nano:4b
   agent:
     platform:
       process-type: CONCURRENT
@@ -53,9 +53,9 @@ spring.ai:
 
 travel-agency:
   models:
-    default-orchestrator: "anthropic/claude-3-5-sonnet"
-    default-extractor: "lmstudio/llama-3-8b"
-    country-specialist: "lmstudio/llama-3-8b"
+    default-orchestrator: "lmstudio/qwen3.5:9b"
+    default-extractor: "lmstudio/nemotron-3-nano:4b"
+    country-specialist: "lmstudio/nemotron-3-nano:4b"
 
   prompts:
     orchestrator: "Test orchestrator prompt"

@@ -33,13 +33,13 @@ embabel:
     # Default LLM must match a model available from a registered provider
     # (Ollama, LM Studio). If using cloud models, activate the 'cloud'
     # profile and uncomment the cloud starters in build.gradle.kts.
-    default-llm: ${EMBABEL_DEFAULT_LLM:llama-3-8b}
+    default-llm: ${EMBABEL_DEFAULT_LLM:qwen3.5:9b}
     llms:
-      orchestrator: ${EMBABEL_LLM_ORCHESTRATOR:llama-3-8b}
-      extractor: ${EMBABEL_LLM_EXTRACTOR:llama-3-8b}
-      country-specialist: llama-3-8b
-      best: ${EMBABEL_LLM_ORCHESTRATOR:llama-3-8b}
-      cheapest: llama-3-8b
+      orchestrator: ${EMBABEL_LLM_ORCHESTRATOR:qwen3.5:9b}
+      extractor: ${EMBABEL_LLM_EXTRACTOR:nemotron-3-nano:4b}
+      country-specialist: nemotron-3-nano:4b
+      best: ${EMBABEL_LLM_ORCHESTRATOR:qwen3.5:9b}
+      cheapest: nemotron-3-nano:4b
   agent:
     platform:
       process-type: CONCURRENT
@@ -68,9 +68,9 @@ spring.ai:
 # ─── Travel Agency Config ───────────────────────────────────────────────────
 travel-agency:
   models:
-    default-orchestrator: ${MATOE_DEFAULT_ORCHESTRATOR:lmstudio/llama-3-8b}
-    default-extractor: ${MATOE_DEFAULT_EXTRACTOR:lmstudio/llama-3-8b}
-    country-specialist: "lmstudio/llama-3-8b"
+    default-orchestrator: ${MATOE_DEFAULT_ORCHESTRATOR:lmstudio/qwen3.5:9b}
+    default-extractor: ${MATOE_DEFAULT_EXTRACTOR:lmstudio/nemotron-3-nano:4b}
+    country-specialist: "lmstudio/nemotron-3-nano:4b"
 
   prompts:
     orchestrator: |

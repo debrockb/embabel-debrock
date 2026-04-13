@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getModels, saveModels, resetModels, newModelId } from '../modelConfig';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
@@ -103,6 +104,9 @@ function AdminDashboard() {
         </button>
         <button className={activeTab === 'targets' ? 'active' : ''} onClick={() => setActiveTab('targets')}>
           Search Targets
+        </button>
+        <button className={activeTab === 'models' ? 'active' : ''} onClick={() => setActiveTab('models')}>
+          Models
         </button>
       </div>
 
@@ -221,6 +225,157 @@ function AdminDashboard() {
           </table>
         </div>
       )}
+      {activeTab === 'models' && <ModelsTab />}
+    </div>
+  );
+}
+
+/** Admin tab for managing the LLM model dropdown list (localStorage-backed). */
+function ModelsTab() {
+  const [models, setModels] = useState(getModels);
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({ provider: '', modelId: '', displayName: '', roles: ['orchestrator', 'extractor'] });
+
+  const persist = (next) => { setModels(next); saveModels(next); };
+
+  const handleToggle = (id) => {
+    persist(models.map((m) => m.id === id ? { ...m, enabled: !m.enabled } : m));
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Remove this model from the list?')) {
+      persist(models.filter((m) => m.id !== id));
+    }
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Reset model list to factory defaults? Custom models will be lost.')) {
+      const defaults = resetModels();
+      setModels(defaults);
+    }
+  };
+
+  const handleRoleToggle = (role) => {
+    setForm((f) => ({
+      ...f,
+      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
+    }));
+  };
+
+  const startAdd = () => {
+    setForm({ provider: 'Local (LM Studio)', modelId: '', displayName: '', roles: ['orchestrator', 'extractor'] });
+    setAdding(true);
+    setEditId(null);
+  };
+
+  const startEdit = (m) => {
+    setForm({ provider: m.provider, modelId: m.modelId, displayName: m.displayName, roles: [...m.roles] });
+    setEditId(m.id);
+    setAdding(false);
+  };
+
+  const handleSave = () => {
+    if (!form.modelId.trim() || !form.displayName.trim()) return;
+    if (editId) {
+      persist(models.map((m) => m.id === editId ? { ...m, ...form } : m));
+      setEditId(null);
+    } else {
+      persist([...models, { ...form, id: newModelId(), enabled: true }]);
+      setAdding(false);
+    }
+    setForm({ provider: '', modelId: '', displayName: '', roles: ['orchestrator', 'extractor'] });
+  };
+
+  const handleCancel = () => { setAdding(false); setEditId(null); };
+
+  const providers = [...new Set(models.map((m) => m.provider))];
+
+  return (
+    <div className="admin-section">
+      <h3>LLM Model Configuration</h3>
+      <p className="admin-hint">
+        Add, edit, or disable models shown in the trip planner dropdowns.
+        Changes are saved in your browser and take effect immediately.
+      </p>
+
+      <div className="model-actions-bar">
+        <button className="save-btn" onClick={startAdd}>+ Add Model</button>
+        <button className="cancel-btn" onClick={handleReset}>Reset to Defaults</button>
+      </div>
+
+      {(adding || editId) && (
+        <div className="model-form">
+          <div className="form-row">
+            <label>Provider Group
+              <input
+                list="provider-suggestions"
+                value={form.provider}
+                onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                placeholder="e.g. Local (LM Studio)"
+              />
+              <datalist id="provider-suggestions">
+                {providers.map((p) => <option key={p} value={p} />)}
+                <option value="Local (LM Studio)" />
+                <option value="Local (Ollama)" />
+                <option value="Anthropic" />
+                <option value="OpenRouter" />
+              </datalist>
+            </label>
+            <label>Model ID (sent to backend)
+              <input
+                value={form.modelId}
+                onChange={(e) => setForm({ ...form, modelId: e.target.value })}
+                placeholder="e.g. lmstudio/qwen3.5:9b"
+              />
+            </label>
+            <label>Display Name
+              <input
+                value={form.displayName}
+                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                placeholder="e.g. Qwen 3.5 9B (LM Studio)"
+              />
+            </label>
+          </div>
+          <div className="form-row">
+            <label className="role-check">
+              <input type="checkbox" checked={form.roles.includes('orchestrator')} onChange={() => handleRoleToggle('orchestrator')} />
+              Orchestrator
+            </label>
+            <label className="role-check">
+              <input type="checkbox" checked={form.roles.includes('extractor')} onChange={() => handleRoleToggle('extractor')} />
+              Extractor
+            </label>
+            <button className="save-btn" onClick={handleSave}>{editId ? 'Update' : 'Add'}</button>
+            <button className="cancel-btn" onClick={handleCancel}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <table className="admin-table">
+        <thead>
+          <tr><th>Provider</th><th>Display Name</th><th>Model ID</th><th>Roles</th><th>Enabled</th><th></th></tr>
+        </thead>
+        <tbody>
+          {models.map((m) => (
+            <tr key={m.id} className={m.enabled ? '' : 'disabled-row'}>
+              <td>{m.provider}</td>
+              <td>{m.displayName}</td>
+              <td><code>{m.modelId}</code></td>
+              <td>{m.roles.join(', ')}</td>
+              <td>
+                <button className={`toggle-btn ${m.enabled ? 'on' : 'off'}`} onClick={() => handleToggle(m.id)}>
+                  {m.enabled ? 'ON' : 'OFF'}
+                </button>
+              </td>
+              <td>
+                <button className="edit-btn" onClick={() => startEdit(m)}>Edit</button>{' '}
+                <button className="cancel-btn" onClick={() => handleDelete(m.id)}>Del</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
