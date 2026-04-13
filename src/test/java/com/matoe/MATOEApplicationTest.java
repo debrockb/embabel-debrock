@@ -1,32 +1,32 @@
 package com.matoe;
 
-import com.embabel.agent.core.AgentPlatform;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * Smoke test: verify our Spring wiring resolves.
+ * Smoke test: verify Spring wiring resolves without a running LLM.
  *
- * <p>{@code AgentPlatform} is mocked because Embabel's
- * {@code ConfigurableModelProvider} requires at least one LLM to be
- * discoverable at startup. In CI there is no running Ollama or LM Studio
- * instance, so the available-models list is empty and the
- * {@code modelProvider} bean fails with "Default LLM '…' not found in
- * available models: []". Lazy init prevents eager creation of Embabel's
- * internal beans; the mock satisfies any code that injects
- * {@code AgentPlatform}.
+ * <p>Embabel's {@code ConfigurableModelProvider} eagerly discovers LLM
+ * models at startup. In CI there is no running Ollama or LM Studio,
+ * so the available-models list is empty and bean creation fails.
  *
- * <p>{@code TravelService} already handles a mocked/absent platform
- * gracefully via the virtual-thread fallback path.
+ * <p>This is handled by two mechanisms:
+ * <ol>
+ *   <li>{@link com.matoe.config.EmbabelLazyInitConfig} — a
+ *       {@code BeanFactoryPostProcessor} that marks all Embabel beans as
+ *       lazy-init, so they are not created until first accessed.</li>
+ *   <li>{@code spring.main.lazy-initialization=true} — belt-and-suspenders
+ *       to catch any Embabel bean not covered by the post-processor.</li>
+ * </ol>
+ *
+ * <p>{@code TravelService} resolves Embabel lazily on the first trip
+ * request (not at construction) and falls back to virtual-thread dispatch
+ * if the platform is unavailable.
  */
 @SpringBootTest
 @TestPropertySource(properties = "spring.main.lazy-initialization=true")
 class MATOEApplicationTest {
-
-    @MockBean
-    AgentPlatform agentPlatform;
 
     @Test
     void contextLoads() {

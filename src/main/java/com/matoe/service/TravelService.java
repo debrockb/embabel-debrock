@@ -1,6 +1,5 @@
 package com.matoe.service;
 
-import com.embabel.agent.core.AgentPlatform;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matoe.agents.TravelPlannerAgent;
@@ -10,7 +9,6 @@ import com.matoe.entity.ItineraryEntity;
 import com.matoe.repository.ItineraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
@@ -55,17 +53,21 @@ public class TravelService {
     private final ItineraryRepository repository;
     private final ObjectMapper objectMapper;
     private final ExecutorService agentExecutor;
-    /** May be null if Embabel autoconfig is excluded in a given profile. */
-    private final AgentPlatform agentPlatform;
+    private final ApplicationContext applicationContext;
+
     /**
-     * The Embabel {@code Agent} wrapper for our {@code @Agent}-annotated
-     * {@link TravelPlannerAgent}. Embabel's component scanner creates an
-     * {@code Agent} bean that wraps the annotated class, scanning its
-     * {@code @Action} methods to build the GOAP action set. This is the
-     * object {@code AgentPlatform.runAgentFrom()} actually accepts — NOT the
-     * raw Spring POJO. Resolved from the ApplicationContext by type.
+     * Lazily-resolved Embabel beans. These are NOT resolved at construction
+     * time because Embabel's {@code ConfigurableModelProvider} eagerly
+     * discovers LLM models — if no Ollama / LM Studio is running yet (common
+     * on NAS where containers start in parallel), the bean creation throws
+     * and would crash the whole app. Instead, we defer resolution to the
+     * first trip request and catch failures gracefully.
+     *
+     * @see com.matoe.config.EmbabelLazyInitConfig
      */
-    private final Object embabelAgentWrapper; // com.embabel.agent.core.Agent
+    private volatile Object agentPlatform;       // com.embabel.agent.core.AgentPlatform
+    private volatile Object embabelAgentWrapper;  // com.embabel.agent.core.Agent
+    private volatile boolean embabelResolved = false;
 
     public TravelService(
             TravelPlannerAgent travelPlannerAgent,
@@ -74,7 +76,6 @@ public class TravelService {
             ItineraryRepository repository,
             ObjectMapper objectMapper,
             @Qualifier("agentExecutor") ExecutorService agentExecutor,
-            @Autowired(required = false) AgentPlatform agentPlatform,
             ApplicationContext applicationContext) {
         this.travelPlannerAgent = travelPlannerAgent;
         this.progressService = progressService;
@@ -82,11 +83,42 @@ public class TravelService {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.agentExecutor = agentExecutor;
-        this.agentPlatform = agentPlatform;
-        this.embabelAgentWrapper = resolveEmbabelAgent(applicationContext);
-        log.info("TravelService initialised — AgentPlatform={}, EmbabelAgent={}, executor=virtual-threads",
-            agentPlatform != null ? "PRESENT" : "absent",
-            embabelAgentWrapper != null ? embabelAgentWrapper.getClass().getSimpleName() : "absent");
+        this.applicationContext = applicationContext;
+        // Embabel beans resolved lazily on first trip — see resolveEmbabelLazily()
+        log.info("TravelService initialised — Embabel will be resolved on first trip request, executor=virtual-threads");
+    }
+
+    /**
+     * Thread-safe lazy resolution of AgentPlatform and the Embabel Agent
+     * wrapper. Called on the first trip request. If Embabel beans can't be
+     * created (e.g. no LLM running), logs a warning and leaves both fields
+     * null — the virtual-thread fallback path handles the trip instead.
+     */
+    private void resolveEmbabelLazily() {
+        if (embabelResolved) return;
+        synchronized (this) {
+            if (embabelResolved) return;
+            try {
+                Class<?> platformType = Class.forName("com.embabel.agent.core.AgentPlatform");
+                Map<String, ?> platforms = applicationContext.getBeansOfType(platformType);
+                if (!platforms.isEmpty()) {
+                    this.agentPlatform = platforms.values().iterator().next();
+                    log.info("AgentPlatform resolved: {}", agentPlatform.getClass().getName());
+                    this.embabelAgentWrapper = resolveEmbabelAgent(applicationContext);
+                } else {
+                    log.info("No AgentPlatform bean found — using virtual-thread fallback");
+                }
+            } catch (Exception e) {
+                log.warn("Embabel AgentPlatform unavailable (LLM provider not reachable?). " +
+                    "Falling back to virtual-thread dispatch. Cause: {}", e.getMessage());
+                this.agentPlatform = null;
+                this.embabelAgentWrapper = null;
+            }
+            embabelResolved = true;
+            log.info("Embabel resolution complete — AgentPlatform={}, EmbabelAgent={}",
+                agentPlatform != null ? "PRESENT" : "absent",
+                embabelAgentWrapper != null ? embabelAgentWrapper.getClass().getSimpleName() : "absent");
+        }
     }
 
     /**
@@ -142,6 +174,9 @@ public class TravelService {
             log.warn("Session {} budget already exceeded — aborting", sessionId);
             throw new RuntimeException("LLM budget ceiling exceeded for this session");
         }
+
+        // Lazily resolve Embabel on the first trip (safe even if LLM is down)
+        resolveEmbabelLazily();
 
         UnforgettableItinerary itinerary;
         if (agentPlatform != null && embabelAgentWrapper != null) {
@@ -220,7 +255,8 @@ public class TravelService {
      * bean), NOT the Spring POJO.
      */
     private Object invokeEmbabelRun(Map<String, Object> bindings) throws Exception {
-        Method[] methods = agentPlatform.getClass().getMethods();
+        Object platform = this.agentPlatform; // volatile read
+        Method[] methods = platform.getClass().getMethods();
 
         // ── 1. runAgentFrom(Agent, ProcessOptions, Map) ──────────────────
         for (Method m : methods) {
@@ -230,7 +266,7 @@ public class TravelService {
                     && p[0].isInstance(embabelAgentWrapper)) {
                 Object opts = resolveDefaultProcessOptions(p[1]);
                 log.debug("Embabel dispatch: runAgentFrom(Agent, ProcessOptions, Map)");
-                return m.invoke(agentPlatform, embabelAgentWrapper, opts, bindings);
+                return m.invoke(platform, embabelAgentWrapper, opts, bindings);
             }
         }
 
@@ -241,7 +277,7 @@ public class TravelService {
             if (p.length == 2 && Map.class.isAssignableFrom(p[1])
                     && p[0].isInstance(embabelAgentWrapper)) {
                 log.debug("Embabel dispatch: runAgentFrom(Agent, Map)");
-                return m.invoke(agentPlatform, embabelAgentWrapper, bindings);
+                return m.invoke(platform, embabelAgentWrapper, bindings);
             }
         }
 
@@ -253,11 +289,11 @@ public class TravelService {
                 if (p.length == 3 && Map.class.isAssignableFrom(p[2])) {
                     Object opts = resolveDefaultProcessOptions(p[1]);
                     log.debug("Embabel dispatch: runAgent(String, ProcessOptions, Map)");
-                    return m.invoke(agentPlatform, "TravelPlanner", opts, bindings);
+                    return m.invoke(platform, "TravelPlanner", opts, bindings);
                 }
                 if (p.length == 2 && Map.class.isAssignableFrom(p[1])) {
                     log.debug("Embabel dispatch: runAgent(String, Map)");
-                    return m.invoke(agentPlatform, "TravelPlanner", bindings);
+                    return m.invoke(platform, "TravelPlanner", bindings);
                 }
             }
         }
