@@ -246,6 +246,22 @@ public class TravelPlannerAgent {
         String sid = request.sessionId();
         List<CompletableFuture<List<TransportOption>>> futures = new ArrayList<>();
 
+        // "own-car" means the traveller drives themselves — no transport search needed,
+        // just a placeholder entry so the orchestrator knows to plan driving routes.
+        if (request.transportTypes().contains("own-car")) {
+            emit(sid, "Car/Bus Agent", "completed", 100, "Using own car");
+            List<TransportOption> ownCar = List.of(new com.matoe.domain.TransportOption(
+                UUID.randomUUID().toString(), "own-car", "Own vehicle", "", "",
+                "Self-drive", 0.0, 0, "", "budget", "user",
+                request.originCity(), request.destination()
+            ));
+            // If own-car is the ONLY transport type, skip all searches
+            if (request.transportTypes().size() == 1) {
+                return new TransportResults(ownCar);
+            }
+            futures.add(CompletableFuture.completedFuture(ownCar));
+        }
+
         if (request.transportTypes().contains("flight")) {
             futures.add(CompletableFuture.supplyAsync(() -> {
                 emit(sid, "Flight Agent", "searching", 20, "Searching flights...");

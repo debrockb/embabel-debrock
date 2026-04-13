@@ -323,7 +323,7 @@ function AccommodationCard({ acc }) {
 }
 
 function TransportCard({ t }) {
-  const icons = { flight: '✈', car: '🚗', bus: '🚌', train: '🚆', ferry: '⛴' };
+  const icons = { flight: '✈', car: '🚗', 'own-car': '🚙', bus: '🚌', train: '🚆', ferry: '⛴' };
   // Generate a fallback search URL based on transport type
   const fallbackUrls = {
     flight: `https://www.skyscanner.com/transport/flights/${encodeURIComponent(t.origin || '')}/${encodeURIComponent(t.destination || '')}/`,

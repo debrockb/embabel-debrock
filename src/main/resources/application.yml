@@ -78,6 +78,8 @@ travel-agency:
       Synthesize accommodation and transport options into 3 itinerary variants (Budget, Standard, Luxury).
       For each variant, create a day-by-day breakdown with morning/afternoon/evening activities,
       meal suggestions, transport notes, and estimated daily costs.
+      If the traveller selected "own-car" as transport, plan the itinerary around driving — include
+      estimated driving times, fuel costs, parking tips, and route suggestions instead of flights/trains.
       Return a JSON object with the three variants and overall trip summary.
 
     hotel-agent: |

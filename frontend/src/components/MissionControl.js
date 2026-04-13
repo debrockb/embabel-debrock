@@ -259,8 +259,8 @@ function MissionControl({ onPlanTrip, isLoading }) {
           <label>Transport</label>
           <div className="checkbox-group">
             {[
-              ['flight', 'Flights'], ['car', 'Car Rental'], ['bus', 'Bus'],
-              ['train', 'Train'], ['ferry', 'Ferry'],
+              ['own-car', 'Own Car'], ['flight', 'Flights'], ['car', 'Car Rental'],
+              ['bus', 'Bus'], ['train', 'Train'], ['ferry', 'Ferry'],
             ].map(([val, label]) => (
               <label key={val}>
                 <input
