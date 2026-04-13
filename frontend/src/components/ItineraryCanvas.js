@@ -230,10 +230,11 @@ function ItineraryCanvas({ itinerary }) {
                   {attr.tags?.length > 0 && (
                     <div className="tags">{attr.tags.map((t, i) => <span key={i} className="tag">{t}</span>)}</div>
                   )}
-                  {attr.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
-                  {attr.bookingUrl && attr.source !== 'llm' && (
-                    <a href={attr.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
-                  )}
+                  {attr.source === 'llm' && <span className="synthetic-warning">AI estimate</span>}
+                  <a
+                    href={attr.bookingUrl || `https://www.viator.com/searchResults/all?text=${encodeURIComponent((attr.name || '') + ' ' + (itinerary.destination || ''))}`}
+                    target="_blank" rel="noopener noreferrer" className="book-btn"
+                  >{attr.source === 'llm' ? 'Search' : 'Book'} &rarr;</a>
                 </div>
               ))}
             </div>
@@ -291,6 +292,12 @@ function ItineraryCanvas({ itinerary }) {
 }
 
 function AccommodationCard({ acc }) {
+  // Always show a booking link — use the LLM-provided URL if available,
+  // otherwise generate a fallback search URL for the accommodation name + location.
+  const searchUrl = acc.bookingUrl ||
+    `https://www.booking.com/searchresults.html?ss=${encodeURIComponent((acc.name || '') + ' ' + (acc.location || ''))}`;
+  const isLlm = acc.source === 'llm';
+
   return (
     <div className={`option-card ${acc.tier}`}>
       <div className="card-header">
@@ -299,21 +306,35 @@ function AccommodationCard({ acc }) {
       </div>
       <p className="location">{acc.location}</p>
       <div className="details">
-        <span className="rating">★ {acc.rating}</span>
+        {acc.rating > 0 && <span className="rating">★ {acc.rating}</span>}
         <span className="price">&euro;{acc.pricePerNight}/night</span>
       </div>
+      {acc.totalPrice > 0 && <p className="total-price">Total: &euro;{acc.totalPrice}</p>}
       <p className="amenities">{acc.amenities && acc.amenities.join(', ')}</p>
-      {acc.source && <span className="source-badge">{acc.source}</span>}
-      {acc.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
-      {acc.bookingUrl && acc.source !== 'llm' && (
-        <a href={acc.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
-      )}
+      <div className="card-footer">
+        {acc.source && <span className="source-badge">{acc.source}</span>}
+        {isLlm && <span className="synthetic-warning">AI estimate — verify price</span>}
+        <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="book-btn">
+          {isLlm ? 'Search on Booking.com' : 'Book'} &rarr;
+        </a>
+      </div>
     </div>
   );
 }
 
 function TransportCard({ t }) {
   const icons = { flight: '✈', car: '🚗', bus: '🚌', train: '🚆', ferry: '⛴' };
+  // Generate a fallback search URL based on transport type
+  const fallbackUrls = {
+    flight: `https://www.skyscanner.com/transport/flights/${encodeURIComponent(t.origin || '')}/${encodeURIComponent(t.destination || '')}/`,
+    train: `https://www.thetrainline.com/`,
+    bus: `https://www.flixbus.com/`,
+    car: `https://www.rentalcars.com/`,
+    ferry: `https://www.directferries.com/`,
+  };
+  const searchUrl = t.bookingUrl || fallbackUrls[t.type] || '#';
+  const isLlm = t.source === 'llm';
+
   return (
     <div className={`option-card ${t.tier}`}>
       <div className="card-header">
@@ -323,15 +344,18 @@ function TransportCard({ t }) {
       <p className="type">{icons[t.type] || '🚗'} {t.type}</p>
       <div className="details">
         <span>{t.departureTime} &rarr; {t.arrivalTime}</span>
-        <span>Duration: {t.duration}</span>
+        {t.duration && <span>Duration: {t.duration}</span>}
       </div>
+      {t.origin && t.destination && <p className="route">{t.origin} &rarr; {t.destination}</p>}
       {t.stops > 0 && <p className="stops">{t.stops} stop(s)</p>}
-      <div className="price">&euro;{t.price}</div>
-      {t.source && <span className="source-badge">{t.source}</span>}
-      {t.source === 'llm' && <span className="synthetic-warning">AI-generated estimate</span>}
-      {t.bookingUrl && t.source !== 'llm' && (
-        <a href={t.bookingUrl} target="_blank" rel="noopener noreferrer" className="book-btn">Book &rarr;</a>
-      )}
+      <div className="price">&euro;{t.price}/person</div>
+      <div className="card-footer">
+        {t.source && <span className="source-badge">{t.source}</span>}
+        {isLlm && <span className="synthetic-warning">AI estimate — verify price</span>}
+        <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="book-btn">
+          {isLlm ? 'Search' : 'Book'} &rarr;
+        </a>
+      </div>
     </div>
   );
 }

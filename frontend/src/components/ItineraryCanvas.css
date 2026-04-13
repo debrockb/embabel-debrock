@@ -207,10 +207,30 @@
   line-height: 1.4;
 }
 
+.card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+.total-price {
+  color: #555;
+  font-size: 0.85rem;
+  margin: 0.25rem 0;
+}
+
+.route {
+  color: #555;
+  font-size: 0.85rem;
+}
+
 .book-btn {
   display: inline-block;
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
+  margin-left: auto;
+  padding: 0.5rem 1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
@@ -218,7 +238,9 @@
   cursor: pointer;
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.85rem;
   transition: transform 0.2s;
+  white-space: nowrap;
 }
 
 .book-btn:hover {
