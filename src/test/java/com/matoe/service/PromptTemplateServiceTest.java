@@ -35,6 +35,7 @@ class PromptTemplateServiceTest {
             List.of("hotel", "bb"),
             List.of("flight"),
             List.of("food", "history"),
+            "half-board",
             "anthropic/claude-3-5-sonnet",
             "lmstudio/llama-3-8b",
             "London",
@@ -208,7 +209,7 @@ class PromptTemplateServiceTest {
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 2),
             1, 0, 0, null, 0,
             100.0, 300.0, null, null, null, null,
-            null, null, null, null
+            null, null, null, null, null
         );
         String template = "Stay for {{nights}} nights in {{destination}}.";
         String result = service.buildHotelPrompt(template, oneNight);
@@ -223,7 +224,7 @@ class PromptTemplateServiceTest {
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 1),
             1, 0, 0, null, 0,
             50.0, 200.0, null, null, null, null,
-            null, null, null, null
+            null, null, null, null, null
         );
         String template = "Stay for {{nights}} nights.";
         String result = service.buildHotelPrompt(template, sameDay);

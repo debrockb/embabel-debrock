@@ -396,7 +396,7 @@ public class TravelService {
             r.guestCount(), r.adults(), r.children(), r.childrenAges(), r.rooms(),
             r.budgetMin(), r.budgetMax(), r.travelStyle(),
             r.accommodationTypes(), r.transportTypes(), r.interestTags(),
-            r.orchestratorModel(), r.extractorModel(), r.originCity(),
+            r.mealPlan(), r.orchestratorModel(), r.extractorModel(), r.originCity(),
             sessionId
         );
     }

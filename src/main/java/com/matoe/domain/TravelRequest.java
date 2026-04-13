@@ -25,6 +25,7 @@ public record TravelRequest(
     @JsonProperty("accommodationTypes") List<String> accommodationTypes,
     @JsonProperty("transportTypes") List<String> transportTypes,
     @JsonProperty("interestTags") List<String> interestTags,
+    @JsonProperty("mealPlan") String mealPlan,                       // "room-only", "breakfast", "half-board", "full-board", "all-inclusive"
     @JsonProperty("orchestratorModel") String orchestratorModel,
     @JsonProperty("extractorModel") String extractorModel,
     @JsonProperty("originCity") String originCity,
@@ -40,6 +41,7 @@ public record TravelRequest(
         if (interestTags == null) interestTags = List.of();
         if (childrenAges == null) childrenAges = List.of();
         if (travelStyle == null) travelStyle = "standard";
+        if (mealPlan == null || mealPlan.isBlank()) mealPlan = "breakfast";
         if (originCity == null) originCity = "";
 
         // Reconcile adults/children/guestCount for backwards compatibility.

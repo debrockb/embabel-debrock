@@ -15,6 +15,7 @@ function MissionControl({ onPlanTrip, isLoading }) {
     budgetMin: 1000,
     budgetMax: 5000,
     travelStyle: 'standard',
+    mealPlan: 'breakfast',
     accommodationTypes: ['hotel', 'bb', 'apartment'],
     transportTypes: ['flight', 'car'],
     interestTags: [],
@@ -192,6 +193,21 @@ function MissionControl({ onPlanTrip, isLoading }) {
               <option value="budget">Budget</option>
               <option value="standard">Standard</option>
               <option value="luxury">Luxury</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Meal Plan</label>
+            <select
+              name="mealPlan"
+              value={formData.mealPlan}
+              onChange={handleInputChange}
+            >
+              <option value="room-only">Room Only</option>
+              <option value="breakfast">Bed & Breakfast</option>
+              <option value="half-board">Half Board (breakfast + dinner)</option>
+              <option value="full-board">Full Board (all meals)</option>
+              <option value="all-inclusive">All-Inclusive</option>
+              <option value="self-catering">Self-Catering</option>
             </select>
           </div>
         </div>

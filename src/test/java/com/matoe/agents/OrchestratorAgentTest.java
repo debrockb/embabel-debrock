@@ -50,6 +50,7 @@ class OrchestratorAgentTest {
             List.of("hotel"),
             List.of("flight"),
             List.of(),
+            null,
             "anthropic/claude-3-5-sonnet",
             "lmstudio/llama-3-8b",
             "London",

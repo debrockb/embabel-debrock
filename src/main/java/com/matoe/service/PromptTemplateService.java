@@ -168,6 +168,7 @@ public class PromptTemplateService {
         vars.put("budgetMin", String.format("%.2f", request.budgetMin()));
         vars.put("budgetMax", String.format("%.2f", request.budgetMax()));
         vars.put("travelStyle", request.travelStyle());
+        vars.put("mealPlan", request.mealPlan() != null ? request.mealPlan() : "breakfast");
         vars.put("originCity", request.originCity() != null ? request.originCity() : "");
         vars.put("interestTags", request.interestTags() != null ?
             String.join(", ", request.interestTags()) : "");

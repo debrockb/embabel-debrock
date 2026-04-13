@@ -83,24 +83,27 @@ travel-agency:
     hotel-agent: |
       Find hotels in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{rooms}} room(s), {{startDate}} to {{endDate}} ({{nights}} nights).
-      Budget: €{{budgetMin}}–€{{budgetMax}} total. Style: {{travelStyle}}.
+      Meal plan: {{mealPlan}}. Budget: €{{budgetMin}}–€{{budgetMax}} total. Style: {{travelStyle}}.
       For each hotel return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
-      pricePerNight is per room. totalPrice = pricePerNight × {{nights}} × {{rooms}}.
+      pricePerNight is per room and should reflect the {{mealPlan}} board basis.
+      totalPrice = pricePerNight × {{nights}} × {{rooms}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Return ONLY valid JSON array.
 
     bb-agent: |
       Find bed-and-breakfasts and charming guesthouses in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{rooms}} room(s), {{startDate}} to {{endDate}} ({{nights}} nights).
-      Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      Meal plan: {{mealPlan}}. Budget: €{{budgetMin}}–€{{budgetMax}} total.
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
-      pricePerNight is per room. totalPrice = pricePerNight × {{nights}} × {{rooms}}.
+      pricePerNight is per room and should reflect the {{mealPlan}} board basis.
+      totalPrice = pricePerNight × {{nights}} × {{rooms}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
       Return ONLY valid JSON array.
 
     apartment-agent: |
       Find holiday apartments and short-term rentals in {{destination}} suitable for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      Meal plan preference: {{mealPlan}} (apartments are typically self-catering).
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
       pricePerNight is for the whole unit. totalPrice = pricePerNight × {{nights}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).
@@ -109,6 +112,7 @@ travel-agency:
     hostel-agent: |
       Find hostels and budget accommodation in {{destination}} for {{adults}} adults and {{children}} children (ages: {{childrenAges}}),
       {{startDate}} to {{endDate}} ({{nights}} nights). Budget: €{{budgetMin}}–€{{budgetMax}} total.
+      Meal plan: {{mealPlan}}.
       For each return: name, pricePerNight, totalPrice, rating, location, amenities (array), bookingUrl, latitude, longitude.
       pricePerNight is per bed. totalPrice = pricePerNight × {{nights}} × {{guestCount}}.
       latitude/longitude must be numeric decimal coordinates (e.g. 48.8566, 2.3522).

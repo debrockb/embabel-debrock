@@ -41,6 +41,7 @@ class DomainModelTest {
             List.of("hotel", "bb"),
             List.of("flight"),
             List.of("food", "history"),
+            "half-board",
             "anthropic/claude-3-5-sonnet",
             "lmstudio/llama-3-8b",
             "London",
@@ -65,6 +66,7 @@ class DomainModelTest {
         assertEquals(List.of("hotel", "bb"), deserialized.accommodationTypes());
         assertEquals(List.of("flight"), deserialized.transportTypes());
         assertEquals(List.of("food", "history"), deserialized.interestTags());
+        assertEquals("half-board", deserialized.mealPlan());
         assertEquals("anthropic/claude-3-5-sonnet", deserialized.orchestratorModel());
         assertEquals("lmstudio/llama-3-8b", deserialized.extractorModel());
         assertEquals("London", deserialized.originCity());
@@ -78,7 +80,7 @@ class DomainModelTest {
             LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 10),
             2, 0, 0, null, 0,
             2000.0, 5000.0, null, null, null, null,
-            null, null, null, null
+            null, null, null, null, null
         );
         assertEquals(9, req.nights());
     }
@@ -90,7 +92,7 @@ class DomainModelTest {
             LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 5),
             1, 0, 0, null, 0,
             500.0, 1500.0, null, null, null, null,
-            null, null, null, null
+            null, null, null, null, null
         );
         // Compact constructor should fill in defaults
         assertEquals(List.of("Berlin"), req.destinations());

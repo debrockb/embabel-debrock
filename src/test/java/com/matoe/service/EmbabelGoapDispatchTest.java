@@ -73,7 +73,7 @@ class EmbabelGoapDispatchTest {
             LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15),
             0, 2, 0, null, 1, 800.0, 3000.0, "standard",
             List.of("hotel"), List.of("flight"), List.of("food", "art"),
-            "lmstudio/llama-3-8b", "lmstudio/llama-3-8b",
+            null, "lmstudio/llama-3-8b", "lmstudio/llama-3-8b",
             "Amsterdam", "goap-test-session"
         );
 
