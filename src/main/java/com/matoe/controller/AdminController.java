@@ -85,7 +85,9 @@ public class AdminController {
     // ── Prompt Management ─────────────────────────────────────────────────────
 
     @GetMapping("/prompts")
-    public ResponseEntity<Map<String, Object>> getAllPrompts() {
+    public ResponseEntity<Map<String, Object>> getAllPrompts(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        requireAuth(token);
         Set<String> agents = promptService.getAgentNames();
         List<Map<String, Object>> prompts = new ArrayList<>();
         for (String agent : agents) {
@@ -99,7 +101,10 @@ public class AdminController {
     }
 
     @GetMapping("/prompts/{agentName}")
-    public ResponseEntity<Map<String, Object>> getPromptDetail(@PathVariable String agentName) {
+    public ResponseEntity<Map<String, Object>> getPromptDetail(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable String agentName) {
+        requireAuth(token);
         return ResponseEntity.ok(Map.of(
             "agentName", agentName,
             "activePrompt", promptService.getPrompt(agentName),
@@ -133,24 +138,34 @@ public class AdminController {
 
     @GetMapping("/costs")
     public ResponseEntity<Map<String, Object>> getCostDashboard(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @RequestParam(defaultValue = "24") int hours) {
+        requireAuth(token);
         return ResponseEntity.ok(costService.getCostDashboard(hours));
     }
 
     @GetMapping("/costs/session/{sessionId}")
-    public ResponseEntity<Map<String, Object>> getSessionCost(@PathVariable String sessionId) {
+    public ResponseEntity<Map<String, Object>> getSessionCost(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable String sessionId) {
+        requireAuth(token);
         return ResponseEntity.ok(costService.getSessionCostSummary(sessionId));
     }
 
     // ── Search Target Management ──────────────────────────────────────────────
 
     @GetMapping("/search-targets")
-    public ResponseEntity<List<SearchTargetEntity>> getAllSearchTargets() {
+    public ResponseEntity<List<SearchTargetEntity>> getAllSearchTargets(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        requireAuth(token);
         return ResponseEntity.ok(searchTargetRepo.findAllByOrderByAgentNameAscPriorityAsc());
     }
 
     @GetMapping("/search-targets/{agentName}")
-    public ResponseEntity<List<SearchTargetEntity>> getSearchTargets(@PathVariable String agentName) {
+    public ResponseEntity<List<SearchTargetEntity>> getSearchTargets(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable String agentName) {
+        requireAuth(token);
         return ResponseEntity.ok(
             searchTargetRepo.findByAgentNameAndEnabledTrueOrderByPriorityAsc(agentName));
     }

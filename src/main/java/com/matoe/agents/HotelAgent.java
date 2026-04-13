@@ -74,7 +74,8 @@ public class HotelAgent {
                     searchTargetService.getSites("hotel-agent", hotelSites),
                     "a JSON array of hotel objects each with: name, pricePerNight (number), " +
                     "totalPrice (number), rating (number 1-5), location (string), " +
-                    "amenities (array of strings), bookingUrl (string)",
+                    "amenities (array of strings), bookingUrl (string), " +
+                    "latitude (number, decimal degrees), longitude (number, decimal degrees)",
                     model
                 );
                 if (raw != null && !raw.isEmpty()) {
@@ -114,7 +115,8 @@ public class HotelAgent {
         return String.format(
             "Search for 4-6 hotels in %s for %d guests, check-in %s, check-out %s (%d nights). " +
             "Budget: €%.0f–€%.0f total. Travel style: %s. " +
-            "For each hotel get: name, price per night, total price, star rating, neighborhood, amenities, booking URL.",
+            "For each hotel get: name, price per night, total price, star rating, neighborhood, amenities, booking URL, " +
+            "and approximate GPS coordinates (latitude, longitude as decimal numbers).",
             request.destination(), request.guestCount(),
             request.startDate(), request.endDate(), nights,
             request.budgetMin(), request.budgetMax(), request.travelStyle()

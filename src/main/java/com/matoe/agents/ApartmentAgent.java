@@ -75,7 +75,8 @@ public class ApartmentAgent {
                     searchTargetService.getSites("apartment-agent", apartmentSites),
                     "a JSON array of apartment objects each with: name, pricePerNight (number), " +
                     "totalPrice (number), rating (number 1-5), location (string), " +
-                    "amenities (array of strings), bookingUrl (string)",
+                    "amenities (array of strings), bookingUrl (string), " +
+                    "latitude (number, decimal degrees), longitude (number, decimal degrees)",
                     model
                 );
                 if (raw != null && !raw.isEmpty()) {
@@ -116,7 +117,8 @@ public class ApartmentAgent {
             "Find 3-5 holiday apartments or short-term rentals in %s for %d guests (%d+ bedrooms needed), " +
             "check-in %s, check-out %s (%d nights). " +
             "Budget: \u20ac%.0f\u2013\u20ac%.0f total. Travel style: %s. " +
-            "For each get: name, price per night, total price, rating, neighborhood, amenities, booking URL.",
+            "For each get: name, price per night, total price, rating, neighborhood, amenities, booking URL, " +
+            "and approximate GPS coordinates (latitude, longitude as decimal numbers).",
             request.destination(), request.guestCount(), bedroomsNeeded,
             request.startDate(), request.endDate(), nights,
             request.budgetMin(), request.budgetMax(), request.travelStyle()

@@ -75,7 +75,8 @@ public class AttractionsAgent {
                     searchTargetService.getSites("attractions-agent", attractionSites),
                     "a JSON array of attraction objects each with: name, description, category, " +
                     "price (number in USD), duration (string like '2h' or 'half-day'), " +
-                    "rating (number 1-5), location (string), bookingUrl (string), tags (array of strings)",
+                    "rating (number 1-5), location (string), bookingUrl (string), tags (array of strings), " +
+                    "latitude (number, decimal degrees), longitude (number, decimal degrees)",
                     model
                 );
                 if (raw != null && !raw.isEmpty()) {
@@ -98,7 +99,8 @@ public class AttractionsAgent {
                 "Interests: %s. Travel style: %s. " +
                 "Return a JSON array where each object has: name, description, category, " +
                 "price (number in USD per person), duration (string), rating (number 1-5), " +
-                "location (string), bookingUrl (string), tags (array of strings). " +
+                "location (string), bookingUrl (string), tags (array of strings), " +
+                "latitude (decimal degrees), longitude (decimal degrees). " +
                 "Return ONLY valid JSON array.",
                 request.destination(), request.guestCount(),
                 request.startDate(), request.endDate(),
@@ -130,7 +132,8 @@ public class AttractionsAgent {
             "visiting from %s to %s. Budget: $%.0f-$%.0f total. Travel style: %s. " +
             "Interests: %s. " +
             "For each attraction get: name, description, category, price per person, duration, " +
-            "rating, location/neighborhood, booking URL, and relevant tags.",
+            "rating, location/neighborhood, booking URL, relevant tags, " +
+            "and approximate GPS coordinates (latitude, longitude as decimal numbers).",
             request.destination(), request.guestCount(),
             request.startDate(), request.endDate(),
             request.budgetMin(), request.budgetMax(), request.travelStyle(),

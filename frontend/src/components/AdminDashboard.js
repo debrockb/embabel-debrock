@@ -25,25 +25,28 @@ function AdminDashboard() {
 
   const fetchPrompts = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/prompts');
+      const res = await fetch('/api/admin/prompts', { headers: authHeaders() });
+      if (!res.ok) { console.warn('Prompts fetch returned', res.status); return; }
       const data = await res.json();
       setPrompts(data.prompts || []);
     } catch (err) { console.error('Failed to fetch prompts:', err); }
-  }, []);
+  }, [adminToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCosts = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/costs?hours=24');
+      const res = await fetch('/api/admin/costs?hours=24', { headers: authHeaders() });
+      if (!res.ok) { console.warn('Costs fetch returned', res.status); return; }
       setCosts(await res.json());
     } catch (err) { console.error('Failed to fetch costs:', err); }
-  }, []);
+  }, [adminToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTargets = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/search-targets');
+      const res = await fetch('/api/admin/search-targets', { headers: authHeaders() });
+      if (!res.ok) { console.warn('Targets fetch returned', res.status); return; }
       setTargets(await res.json());
     } catch (err) { console.error('Failed to fetch targets:', err); }
-  }, []);
+  }, [adminToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchPrompts();

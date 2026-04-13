@@ -74,7 +74,8 @@ public class HostelAgent {
                     searchTargetService.getSites("hostel-agent", hostelSites),
                     "a JSON array of hostel objects each with: name, pricePerNight (number), " +
                     "totalPrice (number), rating (number 1-5), location (string), " +
-                    "amenities (array of strings), bookingUrl (string)",
+                    "amenities (array of strings), bookingUrl (string), " +
+                    "latitude (number, decimal degrees), longitude (number, decimal degrees)",
                     model
                 );
                 if (raw != null && !raw.isEmpty()) {
@@ -115,7 +116,8 @@ public class HostelAgent {
             "Find 3-5 hostels or budget accommodation in %s for %d guests, " +
             "check-in %s, check-out %s (%d nights). " +
             "Budget: \u20ac%.0f\u2013\u20ac%.0f total. Travel style: %s. " +
-            "For each get: name, price per night, total price, rating, neighborhood, amenities, booking URL.",
+            "For each get: name, price per night, total price, rating, neighborhood, amenities, booking URL, " +
+            "and approximate GPS coordinates (latitude, longitude as decimal numbers).",
             request.destination(), request.guestCount(),
             request.startDate(), request.endDate(), nights,
             request.budgetMin(), request.budgetMax(), request.travelStyle()
