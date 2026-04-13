@@ -108,6 +108,9 @@ function AdminDashboard() {
         <button className={activeTab === 'models' ? 'active' : ''} onClick={() => setActiveTab('models')}>
           Models
         </button>
+        <button className={activeTab === 'agents' ? 'active' : ''} onClick={() => setActiveTab('agents')}>
+          Agents
+        </button>
       </div>
 
       {activeTab === 'prompts' && (
@@ -226,6 +229,7 @@ function AdminDashboard() {
         </div>
       )}
       {activeTab === 'models' && <ModelsTab />}
+      {activeTab === 'agents' && <AgentsTab authHeaders={authHeaders} />}
     </div>
   );
 }
@@ -376,6 +380,190 @@ function ModelsTab() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Admin tab for viewing/editing/creating agent configurations (DB-backed). */
+function AgentsTab({ authHeaders }) {
+  const [agents, setAgents] = useState([]);
+  const [editId, setEditId] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    agentName: '', displayName: '', description: '', promptTemplate: '',
+    searchSites: '', resultType: 'accommodation', modelRole: 'extractor',
+    resultSchema: '', enabled: true,
+  });
+  const [loading, setLoading] = useState(false);
+
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/agents', { headers: authHeaders() });
+      if (res.ok) setAgents(await res.json());
+    } catch (err) { console.error('Failed to fetch agents:', err); }
+  }, [authHeaders]);
+
+  useEffect(() => { fetchAgents(); }, [fetchAgents]);
+
+  const startCreate = () => {
+    setForm({
+      agentName: '', displayName: '', description: '', promptTemplate: '',
+      searchSites: '', resultType: 'accommodation', modelRole: 'extractor',
+      resultSchema: '', enabled: true,
+    });
+    setCreating(true);
+    setEditId(null);
+  };
+
+  const startEdit = (a) => {
+    setForm({
+      agentName: a.agentName, displayName: a.displayName || '', description: a.description || '',
+      promptTemplate: a.promptTemplate || '', searchSites: a.searchSites || '',
+      resultType: a.resultType || 'accommodation', modelRole: a.modelRole || 'extractor',
+      resultSchema: a.resultSchema || '', enabled: a.enabled,
+    });
+    setEditId(a.id);
+    setCreating(false);
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      if (editId) {
+        await fetch(`/api/admin/agents/${editId}`, {
+          method: 'PUT', headers: authHeaders(), body: JSON.stringify(form),
+        });
+      } else {
+        await fetch('/api/admin/agents', {
+          method: 'POST', headers: authHeaders(), body: JSON.stringify(form),
+        });
+      }
+      setEditId(null);
+      setCreating(false);
+      fetchAgents();
+    } catch (err) { console.error('Failed to save agent:', err); }
+    setLoading(false);
+  };
+
+  const handleToggle = async (agent) => {
+    await fetch(`/api/admin/agents/${agent.id}`, {
+      method: 'PUT', headers: authHeaders(),
+      body: JSON.stringify({ ...agent, enabled: !agent.enabled }),
+    });
+    fetchAgents();
+  };
+
+  const handleDelete = async (agent) => {
+    if (!window.confirm(`Delete custom agent "${agent.displayName}"?`)) return;
+    await fetch(`/api/admin/agents/${agent.id}`, {
+      method: 'DELETE', headers: authHeaders(),
+    });
+    fetchAgents();
+  };
+
+  const resultTypes = ['accommodation', 'transport', 'attraction', 'intelligence'];
+  const modelRoles = ['orchestrator', 'extractor'];
+
+  return (
+    <div className="admin-section">
+      <h3>Agent Configuration</h3>
+      <p className="admin-hint">
+        View and edit all agents. Built-in agents can be configured but not deleted.
+        Create custom agents that run the same browser-first / LLM-fallback pipeline.
+      </p>
+
+      <div className="model-actions-bar">
+        <button className="save-btn" onClick={startCreate}>+ New Custom Agent</button>
+      </div>
+
+      {(creating || editId) && (
+        <div className="model-form">
+          <div className="form-row">
+            <label>Agent Name (unique key)
+              <input value={form.agentName} disabled={!!editId}
+                onChange={(e) => setForm({ ...form, agentName: e.target.value })}
+                placeholder="e.g. spa-agent" />
+            </label>
+            <label>Display Name
+              <input value={form.displayName}
+                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                placeholder="e.g. Spa & Wellness Agent" />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>Description
+              <input value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="What this agent searches for" />
+            </label>
+            <label>Result Type
+              <select value={form.resultType}
+                onChange={(e) => setForm({ ...form, resultType: e.target.value })}>
+                {resultTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label>Model Role
+              <select value={form.modelRole}
+                onChange={(e) => setForm({ ...form, modelRole: e.target.value })}>
+                {modelRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="form-row">
+            <label style={{flex: 2}}>Search Sites (comma-separated)
+              <input value={form.searchSites}
+                onChange={(e) => setForm({ ...form, searchSites: e.target.value })}
+                placeholder="e.g. tripadvisor.com,yelp.com" />
+            </label>
+          </div>
+          <label>Prompt Template (use &#123;&#123;destination&#125;&#125;, &#123;&#123;startDate&#125;&#125;, &#123;&#123;adults&#125;&#125;, etc.)
+            <textarea rows={6} value={form.promptTemplate}
+              onChange={(e) => setForm({ ...form, promptTemplate: e.target.value })}
+              placeholder="You are a travel expert. Find..." style={{width:'100%', fontFamily:'monospace', fontSize:'0.85rem'}} />
+          </label>
+          <label>Result Schema (JSON hint for browser extraction)
+            <textarea rows={3} value={form.resultSchema}
+              onChange={(e) => setForm({ ...form, resultSchema: e.target.value })}
+              placeholder='e.g. [{"name":"string","price":"number","rating":"number","bookingUrl":"string"}]'
+              style={{width:'100%', fontFamily:'monospace', fontSize:'0.85rem'}} />
+          </label>
+          <div className="form-row" style={{marginTop:'0.75rem'}}>
+            <button className="save-btn" onClick={handleSave} disabled={loading}>
+              {loading ? 'Saving...' : editId ? 'Update Agent' : 'Create Agent'}
+            </button>
+            <button className="cancel-btn" onClick={() => { setEditId(null); setCreating(false); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="agent-grid">
+        {agents.map((a) => (
+          <div key={a.id} className={`agent-card ${a.enabled ? '' : 'disabled-agent'}`}>
+            <div className="agent-card-header">
+              <strong>{a.displayName || a.agentName}</strong>
+              <span className={`agent-type-badge ${a.resultType}`}>{a.resultType}</span>
+              {a.builtIn && <span className="built-in-badge">built-in</span>}
+            </div>
+            <p className="agent-desc">{a.description}</p>
+            <div className="agent-meta">
+              <span>Model: {a.modelRole}</span>
+              <span>Sites: {a.searchSites ? a.searchSites.split(',').length : 0}</span>
+            </div>
+            {a.promptTemplate && (
+              <pre className="prompt-preview">{a.promptTemplate.substring(0, 120)}...</pre>
+            )}
+            <div className="agent-card-actions">
+              <button className={`toggle-btn ${a.enabled ? 'on' : 'off'}`} onClick={() => handleToggle(a)}>
+                {a.enabled ? 'ON' : 'OFF'}
+              </button>
+              <button className="edit-btn" onClick={() => startEdit(a)}>Edit</button>
+              {!a.builtIn && (
+                <button className="cancel-btn" onClick={() => handleDelete(a)}>Delete</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

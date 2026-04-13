@@ -1,7 +1,9 @@
 package com.matoe.controller;
 
+import com.matoe.entity.AgentConfigEntity;
 import com.matoe.entity.PromptVersionEntity;
 import com.matoe.entity.SearchTargetEntity;
+import com.matoe.repository.AgentConfigRepository;
 import com.matoe.repository.SearchTargetRepository;
 import com.matoe.service.DynamicPromptService;
 import com.matoe.service.LlmCostTrackingService;
@@ -36,15 +38,18 @@ public class AdminController {
     private final DynamicPromptService promptService;
     private final LlmCostTrackingService costService;
     private final SearchTargetRepository searchTargetRepo;
+    private final AgentConfigRepository agentConfigRepo;
     private final Environment env;
 
     public AdminController(DynamicPromptService promptService,
                            LlmCostTrackingService costService,
                            SearchTargetRepository searchTargetRepo,
+                           AgentConfigRepository agentConfigRepo,
                            Environment env) {
         this.promptService = promptService;
         this.costService = costService;
         this.searchTargetRepo = searchTargetRepo;
+        this.agentConfigRepo = agentConfigRepo;
         this.env = env;
     }
 
@@ -196,6 +201,113 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // ── Agent Configuration ─────────────────────────────────────────────────
+
+    /** List all agent configs (built-in + custom), seeding built-ins on first call. */
+    @GetMapping("/agents")
+    public ResponseEntity<List<AgentConfigEntity>> listAgents(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        requireAuth(token);
+        seedBuiltInAgentsIfNeeded();
+        return ResponseEntity.ok(agentConfigRepo.findAllByOrderByBuiltInDescAgentNameAsc());
+    }
+
+    /** Get a single agent config by ID. */
+    @GetMapping("/agents/{id}")
+    public ResponseEntity<AgentConfigEntity> getAgent(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable Long id) {
+        requireAuth(token);
+        return agentConfigRepo.findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Create a new custom agent config. */
+    @PostMapping("/agents")
+    public ResponseEntity<AgentConfigEntity> createAgent(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @RequestBody AgentConfigEntity config) {
+        requireAuth(token);
+        config.setBuiltIn(false); // user-created agents are never built-in
+        AgentConfigEntity saved = agentConfigRepo.save(config);
+        // Register the prompt so the dynamic prompt service picks it up
+        if (config.getPromptTemplate() != null) {
+            promptService.registerDefault(config.getAgentName(), config.getPromptTemplate());
+        }
+        return ResponseEntity.ok(saved);
+    }
+
+    /** Update an existing agent config (built-in or custom). */
+    @PutMapping("/agents/{id}")
+    public ResponseEntity<AgentConfigEntity> updateAgent(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable Long id,
+            @RequestBody AgentConfigEntity update) {
+        requireAuth(token);
+        return agentConfigRepo.findById(id).map(existing -> {
+            if (update.getDisplayName() != null) existing.setDisplayName(update.getDisplayName());
+            if (update.getDescription() != null) existing.setDescription(update.getDescription());
+            if (update.getPromptTemplate() != null) existing.setPromptTemplate(update.getPromptTemplate());
+            if (update.getSearchSites() != null) existing.setSearchSites(update.getSearchSites());
+            if (update.getResultType() != null) existing.setResultType(update.getResultType());
+            if (update.getModelRole() != null) existing.setModelRole(update.getModelRole());
+            if (update.getResultSchema() != null) existing.setResultSchema(update.getResultSchema());
+            existing.setEnabled(update.isEnabled());
+            AgentConfigEntity saved = agentConfigRepo.save(existing);
+            // Sync prompt to DynamicPromptService
+            if (saved.getPromptTemplate() != null) {
+                promptService.registerDefault(saved.getAgentName(), saved.getPromptTemplate());
+            }
+            return ResponseEntity.ok(saved);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Delete a custom agent (built-in agents cannot be deleted). */
+    @DeleteMapping("/agents/{id}")
+    public ResponseEntity<Void> deleteAgent(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable Long id) {
+        requireAuth(token);
+        return agentConfigRepo.findById(id).map(agent -> {
+            if (agent.isBuiltIn()) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Cannot delete built-in agents — disable them instead");
+            }
+            agentConfigRepo.deleteById(id);
+            return ResponseEntity.noContent().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Seed the 14 built-in agent configs into the DB on first access. */
+    private void seedBuiltInAgentsIfNeeded() {
+        if (agentConfigRepo.count() > 0) return;
+        List<AgentConfigEntity> builtIns = List.of(
+            agent("hotel-agent", "Hotel Agent", "Search hotels", "accommodation", "extractor", "booking.com,hotels.com,expedia.com"),
+            agent("bb-agent", "B&B Agent", "Search bed & breakfasts", "accommodation", "extractor", "booking.com,airbnb.com"),
+            agent("apartment-agent", "Apartment Agent", "Search holiday apartments", "accommodation", "extractor", "airbnb.com,vrbo.com,booking.com"),
+            agent("hostel-agent", "Hostel Agent", "Search hostels", "accommodation", "extractor", "hostelworld.com,booking.com"),
+            agent("flight-agent", "Flight Agent", "Search flights", "transport", "extractor", "skyscanner.com,google.com/flights"),
+            agent("car-agent", "Car Rental Agent", "Search car rentals", "transport", "extractor", "rentalcars.com,kayak.com/cars"),
+            agent("bus-agent", "Bus Agent", "Search bus routes", "transport", "extractor", "flixbus.com,busbud.com"),
+            agent("train-agent", "Train Agent", "Search train routes", "transport", "extractor", "thetrainline.com,omio.com"),
+            agent("ferry-agent", "Ferry Agent", "Search ferry routes", "transport", "extractor", "directferries.com,aferry.com"),
+            agent("attractions-agent", "Attractions Agent", "Search attractions and experiences", "attraction", "extractor", "viator.com,getyourguide.com"),
+            agent("country-specialist", "Country Specialist", "Regional travel intelligence", "intelligence", "orchestrator", "lonelyplanet.com,tripadvisor.com"),
+            agent("weather-agent", "Weather Agent", "Weather forecasts", "intelligence", "extractor", ""),
+            agent("currency-agent", "Currency Agent", "Currency and exchange info", "intelligence", "extractor", ""),
+            agent("review-summary-agent", "Review Agent", "Traveller review summaries", "intelligence", "extractor", "")
+        );
+        agentConfigRepo.saveAll(builtIns);
+        log.info("Seeded {} built-in agent configs into database", builtIns.size());
+    }
+
+    private AgentConfigEntity agent(String name, String display, String desc, String resultType, String modelRole, String sites) {
+        String prompt = promptService.getPromptOrDefault(name);
+        return new AgentConfigEntity(name, display, desc, prompt, sites, resultType, modelRole, "", true, true);
+    }
+
     // ── System Status ─────────────────────────────────────────────────────────
 
     @GetMapping("/status")
@@ -206,6 +318,7 @@ public class AdminController {
             "status", "running",
             "agents", promptService.getAgentNames(),
             "searchTargets", searchTargetRepo.count(),
+            "agentConfigs", agentConfigRepo.count(),
             "version", "0.1.0"
         ));
     }

@@ -121,7 +121,7 @@ public class TravelPlannerAgent {
         CompletableFuture<Map<String, Object>> insightsFuture = CompletableFuture.supplyAsync(() -> {
             emit(sid, "Country Specialist", "searching", 15, "Researching destination...");
             Map<String, Object> r = countrySpecialistAgent.gatherRegionalInsights(
-                request.destination(), request.orchestratorModel());
+                request.destination(), request.extractorModel());
             emit(sid, "Country Specialist", "completed", 100, "Insights ready");
             return r;
         }, agentExecutor);

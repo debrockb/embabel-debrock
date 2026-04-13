@@ -322,3 +322,80 @@ h4 {
   padding: 0.15rem 0.4rem;
   border-radius: 3px;
 }
+
+/* ── Agents tab ──────────────────────────────────────────────────────────── */
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.agent-card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agent-card.disabled-agent {
+  opacity: 0.5;
+}
+
+.agent-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.agent-card-header strong {
+  flex: 1;
+  color: #333;
+}
+
+.agent-type-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.agent-type-badge.accommodation { background: #e8f5e9; color: #2e7d32; }
+.agent-type-badge.transport { background: #e3f2fd; color: #1565c0; }
+.agent-type-badge.attraction { background: #fff3e0; color: #e65100; }
+.agent-type-badge.intelligence { background: #f3e5f5; color: #7b1fa2; }
+
+.built-in-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: #eceff1;
+  color: #78909c;
+}
+
+.agent-desc {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+}
+
+.agent-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.agent-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}

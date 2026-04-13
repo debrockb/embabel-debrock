@@ -72,7 +72,9 @@ services:
       LMSTUDIO_BASE_URL: ${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       BROWSER_SERVICE_URL: http://matoe-browser-lb:80
-      BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-true}
+      # Disabled by default on NAS — local models (qwen3.5:9b) are too slow for
+      # visual browsing (150s+ per task). Enable when a faster vision model is available.
+      BROWSER_SERVICE_ENABLED: ${BROWSER_SERVICE_ENABLED:-false}
       REDIS_HOST: matoe-redis
       ZIPKIN_ENDPOINT: http://matoe-zipkin:9411/api/v2/spans
       MATOE_TRACE_SAMPLING: ${MATOE_TRACE_SAMPLING:-0.1}

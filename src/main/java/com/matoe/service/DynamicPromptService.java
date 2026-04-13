@@ -32,6 +32,11 @@ public class DynamicPromptService {
         yamlDefaults.put(agentName, yamlPrompt);
     }
 
+    /** Get the active prompt, or the YAML default, or empty string. Used by admin seeding. */
+    public String getPromptOrDefault(String agentName) {
+        return yamlDefaults.getOrDefault(agentName, "");
+    }
+
     /** Get the active prompt for an agent. DB version wins over YAML. */
     public String getPrompt(String agentName) {
         return promptRepo.findByAgentNameAndActiveTrue(agentName)
