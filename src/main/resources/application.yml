@@ -24,12 +24,15 @@ server:
 # ─── Embabel Agent Platform ─────────────────────────────────────────────────
 embabel:
   models:
-    default-llm: claude-3-5-sonnet-20241022
+    # Default LLM must match a model available from a registered provider
+    # (Ollama, LM Studio). If using cloud models, activate the 'cloud'
+    # profile and uncomment the cloud starters in build.gradle.kts.
+    default-llm: ${EMBABEL_DEFAULT_LLM:llama-3-8b}
     llms:
-      orchestrator: claude-3-5-sonnet-20241022
-      extractor: llama-3-8b
+      orchestrator: ${EMBABEL_LLM_ORCHESTRATOR:llama-3-8b}
+      extractor: ${EMBABEL_LLM_EXTRACTOR:llama-3-8b}
       country-specialist: llama-3-8b
-      best: claude-3-5-sonnet-20241022
+      best: ${EMBABEL_LLM_ORCHESTRATOR:llama-3-8b}
       cheapest: llama-3-8b
   agent:
     platform:

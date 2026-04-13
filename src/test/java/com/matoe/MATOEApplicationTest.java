@@ -4,19 +4,25 @@ import com.embabel.agent.core.AgentPlatform;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 /**
- * Smoke test: verify the Spring context starts and all bean wiring resolves.
+ * Smoke test: verify our Spring wiring resolves.
  *
- * {@code AgentPlatform} is mocked because its real bean creation chain
- * ({@code DefaultAgentPlatform → ChatClientLlmOperations → ModelProvider →
- * AnthropicModelsConfig}) requires live LLM provider API keys. In CI and
- * local tests, those keys are not available; the {@code IllegalStateException}
- * from {@code AnthropicModelsConfig} cascades and fails the entire context.
- * TravelService already handles a null/mocked AgentPlatform gracefully via
- * the virtual-thread fallback path.
+ * <p>{@code AgentPlatform} is mocked because Embabel's
+ * {@code ConfigurableModelProvider} requires at least one LLM to be
+ * discoverable at startup. In CI there is no running Ollama or LM Studio
+ * instance, so the available-models list is empty and the
+ * {@code modelProvider} bean fails with "Default LLM '…' not found in
+ * available models: []". Lazy init prevents eager creation of Embabel's
+ * internal beans; the mock satisfies any code that injects
+ * {@code AgentPlatform}.
+ *
+ * <p>{@code TravelService} already handles a mocked/absent platform
+ * gracefully via the virtual-thread fallback path.
  */
 @SpringBootTest
+@TestPropertySource(properties = "spring.main.lazy-initialization=true")
 class MATOEApplicationTest {
 
     @MockBean

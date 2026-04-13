@@ -22,12 +22,12 @@ server:
 
 embabel:
   models:
-    default-llm: claude-3-5-sonnet-20241022
+    default-llm: llama-3-8b
     llms:
-      orchestrator: claude-3-5-sonnet-20241022
+      orchestrator: llama-3-8b
       extractor: llama-3-8b
       country-specialist: llama-3-8b
-      best: claude-3-5-sonnet-20241022
+      best: llama-3-8b
       cheapest: llama-3-8b
   agent:
     platform:

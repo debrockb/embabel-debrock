@@ -9,10 +9,8 @@ name: Publish Images
 #   - tag push vX.Y.Z (publishes :X.Y.Z)
 #   - manual dispatch
 #
-# Non-blocking: the `continue-on-error` on the matrix ensures one image's
-# failure does not block the others from publishing, so a transient registry
-# blip or a single-component build break never bricks the whole deployment
-# surface.
+# fail-fast: false allows all three images to attempt building even if one
+# fails, but the overall workflow still reports failure if any image breaks.
 
 on:
   push:
