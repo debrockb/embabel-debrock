@@ -1,8 +1,6 @@
 package com.matoe.service;
 
 import com.embabel.agent.core.AgentPlatform;
-import com.embabel.agent.core.AgentProcess;
-import com.embabel.agent.core.ProcessOptions;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.matoe.agents.TravelPlannerAgent;
@@ -16,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -124,44 +122,81 @@ public class TravelService {
         try {
             log.info("Running trip via Embabel AgentPlatform (GOAP planner)");
             Map<String, Object> bindings = Map.of("travelRequest", request);
-            AgentProcess process = agentPlatform.runAgentFrom(
-                travelPlannerAgent, defaultProcessOptions(), bindings);
-            UnforgettableItinerary result = process.resultOfType(UnforgettableItinerary.class);
-            if (result != null) {
-                return result;
+
+            // AgentPlatform.runAgentFrom(Agent, ProcessOptions, Map) — the first
+            // parameter expects Embabel's Agent interface.  TravelPlannerAgent is
+            // an @Agent-annotated POJO; Embabel discovers it via scanning but its
+            // runtime type doesn't implement Agent at the Java type level, so we
+            // call the method reflectively to let Embabel's internal routing handle
+            // the dispatch.
+            Object process = invokeRunAgentFrom(bindings);
+            if (process == null) {
+                log.warn("Embabel runAgentFrom returned null — falling back");
+                return runViaVirtualThreads(request, sessionId);
+            }
+
+            // process.run() — some Embabel overloads return a lazy handle.
+            try {
+                process.getClass().getMethod("run").invoke(process);
+            } catch (NoSuchMethodException ignored) { /* already completed */ }
+
+            // process.resultOfType(Class) — typed result extraction.
+            Method resultMethod = process.getClass().getMethod("resultOfType", Class.class);
+            Object result = resultMethod.invoke(process, UnforgettableItinerary.class);
+            if (result instanceof UnforgettableItinerary it) {
+                return it;
             }
             log.warn("Embabel process produced no UnforgettableItinerary — falling back");
         } catch (Exception e) {
             log.warn("Embabel execution failed — falling back to virtual-thread path: {}",
-                e.getMessage());
+                e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
         }
         return runViaVirtualThreads(request, sessionId);
     }
 
     /**
-     * {@code ProcessOptions} is a Kotlin class. Its default instance is
-     * exposed as {@code ProcessOptions.DEFAULT} to Java when the Kotlin
-     * declaration uses {@code @JvmField} on a {@code companion object} const.
-     * If that exact JVM-binary shape changes between 0.3.x patch versions,
-     * we fall back to {@code Companion.getDEFAULT()} and finally to a no-arg
-     * constructor, so we do not have to re-release on a trivial API tweak.
+     * Reflectively call {@code AgentPlatform.runAgentFrom(...)}. Embabel 0.3.5
+     * overloads this method; we probe for the 3-arg form first (Agent,
+     * ProcessOptions, Map), then the 2-arg (Agent, Map). A reflective call
+     * avoids a compile-time dependency on Embabel's {@code Agent} interface
+     * which is implemented by Embabel's proxy layer, not by our POJO.
      */
-    private static ProcessOptions defaultProcessOptions() {
-        try {
-            Field f = ProcessOptions.class.getField("DEFAULT");
-            Object v = f.get(null);
-            if (v instanceof ProcessOptions po) return po;
-        } catch (NoSuchFieldException | IllegalAccessException ignored) { /* try companion */ }
-        try {
-            Object companion = ProcessOptions.class.getField("Companion").get(null);
-            Object v = companion.getClass().getMethod("getDEFAULT").invoke(companion);
-            if (v instanceof ProcessOptions po) return po;
-        } catch (ReflectiveOperationException ignored) { /* try ctor */ }
-        try {
-            return ProcessOptions.class.getDeclaredConstructor().newInstance();
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Cannot obtain ProcessOptions default", e);
+    private Object invokeRunAgentFrom(Map<String, Object> bindings) throws Exception {
+        Method[] methods = agentPlatform.getClass().getMethods();
+        // 3-arg form: (Agent, ProcessOptions, Map)
+        for (Method m : methods) {
+            if (!"runAgentFrom".equals(m.getName())) continue;
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 3 && Map.class.isAssignableFrom(p[2])) {
+                Object opts = resolveDefaultProcessOptions(p[1]);
+                return m.invoke(agentPlatform, travelPlannerAgent, opts, bindings);
+            }
         }
+        // 2-arg form: (Agent, Map)
+        for (Method m : methods) {
+            if (!"runAgentFrom".equals(m.getName())) continue;
+            Class<?>[] p = m.getParameterTypes();
+            if (p.length == 2 && Map.class.isAssignableFrom(p[1])) {
+                return m.invoke(agentPlatform, travelPlannerAgent, bindings);
+            }
+        }
+        throw new NoSuchMethodException("No compatible AgentPlatform.runAgentFrom overload");
+    }
+
+    /** Resolve the default ProcessOptions instance from Embabel's Kotlin class. */
+    private static Object resolveDefaultProcessOptions(Class<?> optsType) {
+        // @JvmField companion val → static field DEFAULT
+        try { return optsType.getField("DEFAULT").get(null); }
+        catch (ReflectiveOperationException ignored) {}
+        // Kotlin companion object accessor
+        try {
+            Object companion = optsType.getField("Companion").get(null);
+            return companion.getClass().getMethod("getDEFAULT").invoke(companion);
+        } catch (ReflectiveOperationException ignored) {}
+        // No-arg constructor
+        try { return optsType.getDeclaredConstructor().newInstance(); }
+        catch (ReflectiveOperationException ignored) {}
+        return null; // will pass null; Embabel may use its internal default
     }
 
     // ── Execution Path 2: Virtual-thread fan-out (fallback) ───────────────────
