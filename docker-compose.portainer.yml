@@ -83,6 +83,8 @@ services:
     depends_on:
       matoe-postgres:
         condition: service_healthy
+      matoe-redis:
+        condition: service_started
       matoe-browser-lb:
         condition: service_started
       matoe-zipkin:

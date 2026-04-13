@@ -54,12 +54,17 @@ public class EmbabelLazyInitConfig implements BeanFactoryPostProcessor {
     private static boolean isEmbabelBean(String className, String beanName) {
         if (className != null) {
             if (className.startsWith("com.embabel")) return true;
-            // Spring AI model provider beans that Embabel triggers
+            // Spring AI beans that Embabel's model starters trigger
+            if (className.startsWith("org.springframework.ai")) return true;
             if (className.contains("ModelProvider") || className.contains("ModelsConfig")) return true;
+            if (className.contains("ChatModel") || className.contains("EmbeddingModel")) return true;
         }
         // Embabel-registered beans may not have a className set (e.g. @Bean methods)
-        if (beanName.contains("embabel") || beanName.contains("Embabel")) return true;
-        if (beanName.contains("agentPlatform") || beanName.contains("AgentPlatform")) return true;
+        String lower = beanName.toLowerCase();
+        if (lower.contains("embabel")) return true;
+        if (lower.contains("agentplatform")) return true;
+        if (lower.contains("modelprovider") || lower.contains("chatmodel")) return true;
+        if (lower.contains("spring.ai") || lower.contains("springai")) return true;
         return false;
     }
 }

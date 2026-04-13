@@ -126,6 +126,22 @@ management:
   tracing:
     enabled: false
 
+# Exclude Embabel auto-configurations in tests — ConfigurableModelProvider
+# validates that configured LLMs are reachable, which fails in CI (no Ollama /
+# LM Studio running).  EmbabelLazyInitConfig handles this at runtime, but
+# EnvironmentPostProcessor + eager auto-config beans bypass lazy-init.
+spring.autoconfigure.exclude:
+  - com.embabel.agent.autoconfigure.platform.AgentPlatformAutoConfiguration
+  - com.embabel.agent.autoconfigure.models.ollama.AgentOllamaAutoConfiguration
+  - com.embabel.agent.autoconfigure.models.lmstudio.AgentLmStudioAutoConfiguration
+  - com.embabel.agent.autoconfigure.models.openai.AgentOpenAiAutoConfiguration
+  - com.embabel.agent.autoconfigure.models.anthropic.AgentAnthropicAutoConfiguration
+  - com.embabel.agent.autoconfigure.models.openai.custom.AgentOpenAiCustomAutoConfiguration
+  - com.embabel.agent.autoconfigure.observability.OpenTelemetrySdkAutoConfiguration
+  - com.embabel.agent.autoconfigure.observability.MicrometerTracingAutoConfiguration
+  - com.embabel.agent.autoconfigure.observability.ObservabilityAutoConfiguration
+  - com.embabel.agent.autoconfigure.observability.TrackedAspectAutoConfiguration
+
 logging:
   level:
     root: WARN

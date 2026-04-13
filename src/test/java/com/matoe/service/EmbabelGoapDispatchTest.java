@@ -170,8 +170,10 @@ class EmbabelGoapDispatchTest {
         UnforgettableItinerary result2 = service.planTrip(testRequest, "goap-s2");
         assertEquals("goap-result-id", result2.id());
 
-        // AgentPlatform resolution only happened once
-        verify(ctx, times(1)).getBeansOfType(any());
+        // AgentPlatform resolution only happened on the first trip (2 calls:
+        // one for AgentPlatform type, one for Agent type in resolveEmbabelAgent).
+        // The second trip hits the cached path and makes no context queries.
+        verify(ctx, times(2)).getBeansOfType(any());
         // Virtual-thread fallback should never have been called
         verify(travelPlannerAgent, never()).gatherIntelligence(any());
     }
