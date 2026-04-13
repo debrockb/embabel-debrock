@@ -77,7 +77,9 @@ public class OrchestratorAgent {
 
         try {
             long start = System.currentTimeMillis();
-            String raw = llmService.call(model, systemPrompt, userPrompt);
+            // Synthesis generates large JSON (3 variants × day-by-day breakdown).
+            // Default 4096 tokens truncates the response — use 8192.
+            String raw = llmService.call(model, systemPrompt, userPrompt, 8192);
             long durationMs = System.currentTimeMillis() - start;
 
             costTracker.logCall(request.sessionId(), "orchestrator", model,
@@ -85,6 +87,8 @@ public class OrchestratorAgent {
                 estimateTokens(raw), durationMs, true, null);
 
             String json = llmService.extractJson(raw);
+            // LLM responses may be truncated at token limit — attempt repair
+            json = llmService.repairJson(json);
             Map<String, Object> synthesized = objectMapper.readValue(json, new TypeReference<>() {});
 
             variants = parseVariants(synthesized, request);

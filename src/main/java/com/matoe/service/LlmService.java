@@ -81,10 +81,16 @@ public class LlmService {
      * @param modelString e.g. "anthropic/claude-3-5-sonnet", "lmstudio/llama-3-8b",
      *                    "ollama/mistral", "openrouter/openai/gpt-4o"
      */
+    /** Standard call with default max_tokens (4096). */
     @Observed(name = "matoe.llm.call", contextualName = "llm-call",
              lowCardinalityKeyValues = {"component", "llm-service"})
     @Cacheable(value = "llm-responses", unless = "#result == null")
     public String call(String modelString, String systemPrompt, String userPrompt) {
+        return call(modelString, systemPrompt, userPrompt, 4096);
+    }
+
+    /** Call with custom max_tokens — use higher values for synthesis prompts that generate large JSON. */
+    public String call(String modelString, String systemPrompt, String userPrompt, int maxTokens) {
         if (modelString == null || modelString.isBlank()) {
             // Default to LM Studio for local-only NAS deployments.
             // Override via travel-agency.models.default-orchestrator / default-extractor.
@@ -92,37 +98,36 @@ public class LlmService {
         }
 
         if (modelString.startsWith("anthropic/")) {
-            return callAnthropic(resolveAnthropicModel(modelString), systemPrompt, userPrompt);
+            return callAnthropic(resolveAnthropicModel(modelString), systemPrompt, userPrompt, maxTokens);
         } else if (modelString.startsWith("lmstudio/")) {
             return callOpenAiCompatible(
                 stripPrefix(modelString), lmStudioUrl, null,
-                systemPrompt, userPrompt, "LM Studio", timeoutLocalSeconds
+                systemPrompt, userPrompt, "LM Studio", timeoutLocalSeconds, maxTokens
             );
         } else if (modelString.startsWith("ollama/")) {
             return callOpenAiCompatible(
                 stripPrefix(modelString), ollamaUrl, null,
-                systemPrompt, userPrompt, "Ollama", timeoutLocalSeconds
+                systemPrompt, userPrompt, "Ollama", timeoutLocalSeconds, maxTokens
             );
         } else if (modelString.startsWith("openrouter/")) {
-            // "openrouter/openai/gpt-4o" → model = "openai/gpt-4o"
             String model = modelString.substring("openrouter/".length());
             return callOpenAiCompatible(
                 model, openRouterBaseUrl, openRouterApiKey,
-                systemPrompt, userPrompt, "OpenRouter", timeoutCloudSeconds
+                systemPrompt, userPrompt, "OpenRouter", timeoutCloudSeconds, maxTokens
             );
         }
 
         log.warn("Unrecognised model prefix '{}', falling back to Anthropic default", modelString);
-        return callAnthropic(defaultAnthropicModel, systemPrompt, userPrompt);
+        return callAnthropic(defaultAnthropicModel, systemPrompt, userPrompt, maxTokens);
     }
 
     // ── provider implementations ──────────────────────────────────────────────
 
-    private String callAnthropic(String model, String systemPrompt, String userPrompt) {
+    private String callAnthropic(String model, String systemPrompt, String userPrompt, int maxTokens) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", model);
-            body.put("max_tokens", 4096);
+            body.put("max_tokens", maxTokens);
             body.put("system", systemPrompt != null ? systemPrompt : "");
             body.put("messages", List.of(Map.of("role", "user", "content", userPrompt)));
 
@@ -160,7 +165,7 @@ public class LlmService {
 
     private String callOpenAiCompatible(
             String model, String baseUrl, String apiKey,
-            String systemPrompt, String userPrompt, String label, int timeoutSeconds) {
+            String systemPrompt, String userPrompt, String label, int timeoutSeconds, int maxTokens) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", model);
@@ -168,7 +173,7 @@ public class LlmService {
                 Map.of("role", "system", "content", systemPrompt != null ? systemPrompt : ""),
                 Map.of("role", "user",   "content", userPrompt != null ? userPrompt : "")
             ));
-            body.put("max_tokens", 4096);
+            body.put("max_tokens", maxTokens);
             body.put("temperature", 0.7);
 
             log.debug("Calling {} at {} with model={}", label, baseUrl, model);
@@ -239,5 +244,56 @@ public class LlmService {
     /** Parse JSON string into a typed object via Jackson. */
     public <T> T parseJson(String json, Class<T> targetClass) throws Exception {
         return objectMapper.readValue(json, targetClass);
+    }
+
+    /**
+     * Attempt to repair truncated JSON from LLM responses that hit the token limit.
+     * Closes unclosed strings, arrays, and objects by tracking bracket depth.
+     */
+    public String repairJson(String json) {
+        if (json == null || json.isBlank()) return json;
+        String s = json.strip();
+
+        // Track open brackets/braces
+        int braces = 0, brackets = 0;
+        boolean inString = false;
+        char prev = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (inString) {
+                if (c == '"' && prev != '\\') inString = false;
+            } else {
+                switch (c) {
+                    case '"' -> inString = true;
+                    case '{' -> braces++;
+                    case '}' -> braces--;
+                    case '[' -> brackets++;
+                    case ']' -> brackets--;
+                }
+            }
+            prev = c;
+        }
+
+        // If we're in an unclosed string, close it
+        StringBuilder sb = new StringBuilder(s);
+        if (inString) {
+            sb.append('"');
+        }
+
+        // Remove trailing comma before closing
+        String trimmed = sb.toString().stripTrailing();
+        if (trimmed.endsWith(",")) {
+            sb = new StringBuilder(trimmed.substring(0, trimmed.length() - 1));
+        }
+
+        // Close unclosed brackets/braces
+        for (int i = 0; i < brackets; i++) sb.append(']');
+        for (int i = 0; i < braces; i++) sb.append('}');
+
+        String repaired = sb.toString();
+        if (!repaired.equals(s)) {
+            log.info("Repaired truncated JSON: added {} closing chars", repaired.length() - s.length());
+        }
+        return repaired;
     }
 }
